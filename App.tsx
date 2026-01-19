@@ -223,7 +223,7 @@ export default function App() {
     } else {
       // Send to WhatsApp
       const whatsappNumber = "5584933004076";
-      let msg = `*PEDIDO BELLE LINGERIE*\n\n👤 *Cliente:* ${checkoutData.name}\n📍 *Endereço:* ${checkoutData.address}\n💳 *Pagamento:* ${checkoutData.payment}\n\n🛒 *ITENS:*`;
+      let msg = `*Pedido NQ Secrets*\n\n👤 *Cliente:* ${checkoutData.name}\n📍 *Endereço:* ${checkoutData.address}\n💳 *Pagamento:* ${checkoutData.payment}\n\n🛒 *ITENS:*`;
       cart.forEach(i => msg += `\n- ${i.quantity}x ${i.name} (${i.selectedSize}, ${i.selectedColor})`);
       
       if (appliedCoupon) {
@@ -516,9 +516,6 @@ export default function App() {
                 <source src="https://i.imgur.com/bxSSUjP.mp4" type="video/mp4" />
              </video>
              <div className="absolute inset-0 bg-black/20"></div>
-             <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-8xl md:text-9xl opacity-30 font-bold tracking-tighter text-white mix-blend-overlay select-none animate-subtle-zoom">BELLE</span>
-             </div>
         </div>
       </section>
 
@@ -721,7 +718,7 @@ export default function App() {
                     )}
                     {checkoutStep === 2 && (
                          <div className="space-y-3 animate-fade-in">
-                            {['PIX', 'Cartão de Crédito'].map(method => (
+                            {['Débito', 'Crédito', 'Pix'].map(method => (
                                 <label key={method} className="flex items-center p-4 rounded-xl bg-[#2c2c2e] cursor-pointer hover:bg-[#3a3a3c] transition-colors">
                                     <input 
                                         type="radio" 
