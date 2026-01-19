@@ -647,7 +647,7 @@ export default function App() {
                         placeholder="Cupom de desconto" 
                         className="flex-1 bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-ios-blue outline-none uppercase"
                     />
-                    <button onClick={handleApplyCoupon} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Applying</button>
+                    <button onClick={handleApplyCoupon} className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">Aplicar</button>
                 </div>
                 
                 {appliedCoupon && (
