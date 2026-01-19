@@ -726,7 +726,6 @@ export default function App() {
                 <div className="flex-1 flex items-center justify-center p-4">
                     <div className="bg-ios-card w-full max-w-sm rounded-3xl p-8 shadow-2xl border border-white/10">
                         <h3 className="text-xl font-bold text-white mb-2 text-center">Área Administrativa</h3>
-                        <p className="text-gray-500 text-sm mb-6 text-center">Senha: NEILAQUEIROZ</p>
                         <input 
                             type="password" 
                             className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white mb-4 focus:border-ios-blue outline-none text-center tracking-widest"
