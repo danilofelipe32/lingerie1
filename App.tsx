@@ -124,7 +124,9 @@ export default function App() {
       // Fetch Categories
       const { data: catData } = await supabase.from('categories').select('*').order('id');
       if (catData && catData.length > 0) {
-        setCategories([{ id: 'all', label: 'Todos' }, ...catData]);
+        // Ensure no duplicates for 'Todos'
+        const customCategories = catData.filter((c: any) => c.id !== 'all' && c.label !== 'Todos');
+        setCategories([{ id: 'all', label: 'Todos' }, ...customCategories]);
       } else {
         setCategories(INITIAL_CATEGORIES);
       }
@@ -849,20 +851,18 @@ export default function App() {
                                 <div className="space-y-6">
                                      <h3 className="text-2xl font-bold text-white">Categorias</h3>
                                      <div className="space-y-2">
-                                        {categories.map(c => (
+                                        {categories.filter(c => c.id !== 'all').map(c => (
                                             <div key={c.id} className="bg-white/5 p-3 rounded-lg text-white flex justify-between">
                                                 <span>{c.label}</span>
-                                                {c.id !== 'all' && (
-                                                    <button 
-                                                        onClick={async () => {
-                                                            setCategories(p => p.filter(x => x.id !== c.id));
-                                                            await supabase.from('categories').delete().eq('id', c.id);
-                                                        }} 
-                                                        className="text-red-500 text-xs"
-                                                    >
-                                                        Remover
-                                                    </button>
-                                                )}
+                                                <button 
+                                                    onClick={async () => {
+                                                        setCategories(p => p.filter(x => x.id !== c.id));
+                                                        await supabase.from('categories').delete().eq('id', c.id);
+                                                    }} 
+                                                    className="text-red-500 text-xs"
+                                                >
+                                                    Remover
+                                                </button>
                                             </div>
                                         ))}
                                         <div className="flex gap-2 pt-4">
