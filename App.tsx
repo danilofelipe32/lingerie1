@@ -884,6 +884,93 @@ export default function App() {
                                      </div>
                                 </div>
                             )}
+
+                            {adminTab === 'coupons' && (
+                                <div className="space-y-6">
+                                    <h3 className="text-2xl font-bold text-white">Cupons de Desconto</h3>
+                                    
+                                    <div className="space-y-3">
+                                        {coupons.map(c => (
+                                            <div key={c.code} className="bg-white/5 p-4 rounded-xl flex justify-between items-center border border-white/5">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="bg-ios-green/20 p-2 rounded-lg text-ios-green">
+                                                        <Tag className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-white text-lg tracking-wider uppercase">{c.code}</h4>
+                                                        <p className="text-xs text-gray-400">{c.discount}% de desconto</p>
+                                                    </div>
+                                                </div>
+                                                <button 
+                                                    onClick={async () => {
+                                                        if(window.confirm(`Excluir o cupom ${c.code}?`)) {
+                                                            setCoupons(prev => prev.filter(x => x.code !== c.code));
+                                                            await supabase.from('coupons').delete().eq('code', c.code);
+                                                        }
+                                                    }}
+                                                    className="p-2 text-gray-500 hover:text-red-500 hover:bg-white/5 rounded-lg transition-colors"
+                                                >
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="bg-white/5 p-6 rounded-2xl border border-white/10 mt-8">
+                                        <h4 className="font-bold text-white mb-4 text-sm uppercase tracking-wide text-gray-500">Criar Novo Cupom</h4>
+                                        <div className="flex gap-4 items-end">
+                                            <div className="flex-1">
+                                                <label className="block text-xs text-gray-500 mb-2">Código do Cupom</label>
+                                                <input 
+                                                    id="new-coupon-code"
+                                                    placeholder="EX: PROMO10" 
+                                                    className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-ios-blue outline-none uppercase font-bold tracking-wider placeholder-gray-600" 
+                                                />
+                                            </div>
+                                            <div className="w-32">
+                                                <label className="block text-xs text-gray-500 mb-2">Desconto (%)</label>
+                                                <input 
+                                                    id="new-coupon-disc"
+                                                    type="number" 
+                                                    placeholder="10" 
+                                                    className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-ios-blue outline-none text-center font-bold" 
+                                                />
+                                            </div>
+                                            <button 
+                                                onClick={async () => {
+                                                    const codeInput = document.getElementById('new-coupon-code') as HTMLInputElement;
+                                                    const discInput = document.getElementById('new-coupon-disc') as HTMLInputElement;
+                                                    
+                                                    const code = codeInput.value.trim().toUpperCase();
+                                                    const discount = Number(discInput.value);
+
+                                                    if(!code || !discount) return alert('Preencha o código e o valor do desconto.');
+                                                    if(coupons.some(c => c.code === code)) return alert('Este cupom já existe.');
+
+                                                    const newCoupon = { code, discount };
+                                                    
+                                                    // Optimistic update
+                                                    setCoupons(prev => [...prev, newCoupon]);
+                                                    
+                                                    // DB Insert
+                                                    const { error } = await supabase.from('coupons').insert(newCoupon);
+                                                    
+                                                    if (error) {
+                                                        console.error(error);
+                                                        alert('Erro ao criar cupom. Tente novamente.');
+                                                    } else {
+                                                        codeInput.value = '';
+                                                        discInput.value = '';
+                                                    }
+                                                }}
+                                                className="bg-ios-blue text-white font-bold px-6 py-3 rounded-xl hover:bg-blue-600 transition-colors shadow-lg shadow-blue-900/20"
+                                            >
+                                                Criar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </main>
                     </div>
                 </>
