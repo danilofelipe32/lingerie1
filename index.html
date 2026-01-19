@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full antialiased">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo de Lingerie | Belle Lingerie</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Inter"', 'sans-serif'],
+                        display: ['"Inter"', 'sans-serif'],
+                    },
+                    colors: {
+                        ios: {
+                            black: '#000000',
+                            card: '#1c1c1e',
+                            gray: '#8e8e93',
+                            blue: '#0a84ff',
+                            purple: '#bf5af2',
+                            red: '#ff453a',
+                            green: '#30d158',
+                            divider: '#38383a'
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'scale-in': 'scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'subtle-zoom': 'subtleZoom 15s ease-in-out infinite alternate',
+                        'explosion': 'explosion 2s ease-in-out infinite',
+                        'blob': 'blob 10s infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: 0, transform: 'translateY(10px)' },
+                            '100%': { opacity: 1, transform: 'translateY(0)' },
+                        },
+                        scaleIn: {
+                            '0%': { opacity: 0, transform: 'scale(0.95)' },
+                            '100%': { opacity: 1, transform: 'scale(1)' },
+                        },
+                        subtleZoom: {
+                            '0%': { transform: 'scale(1)', opacity: '0.2' },
+                            '100%': { transform: 'scale(1.15)', opacity: '0.3' },
+                        },
+                        explosion: {
+                            '0%, 100%': { transform: 'scale(1)', 'text-shadow': 'none', 'letter-spacing': 'normal' },
+                            '50%': { 
+                                transform: 'scale(1.1)', 
+                                'text-shadow': '0 0 20px rgba(255,255,255,0.8), 0 0 40px rgba(191, 90, 242, 0.4)', 
+                                'letter-spacing': '0.05em' 
+                            }
+                        },
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000000;
+            color: #f5f5f7;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-nav {
+            background-color: rgba(28, 28, 30, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+  }
+}
+</script>
+</head>
+<body class="h-full bg-black text-white selection:bg-ios-blue selection:text-white relative">
+    <div id="root"></div>
+</body>
+</html>
