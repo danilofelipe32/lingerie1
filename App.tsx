@@ -11,7 +11,7 @@ import {
   ALL_COLORS,
   CheckoutData
 } from './types';
-import { ShoppingBag, X, Check, Lock, Grid, Tag, Settings, Plus, Trash2, Edit2, Search, Loader } from 'lucide-react';
+import { ShoppingBag, X, Check, Lock, Grid, Tag, Settings, Plus, Trash2, Edit2, Search, Loader, Upload } from 'lucide-react';
 import { supabase } from './supabase';
 
 // --- Helper Functions for DB Mapping ---
@@ -91,6 +91,7 @@ export default function App() {
   const [adminPassword, setAdminPassword] = useState('');
   const [adminTab, setAdminTab] = useState<'products' | 'categories' | 'coupons' | 'settings'>('products');
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Checkout State
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -245,6 +246,37 @@ export default function App() {
       setIsAdminLoggedIn(true);
     } else {
       alert("Senha incorreta");
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    const file = e.target.files[0];
+    const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`;
+    
+    setIsUploading(true);
+    try {
+      // Upload file to Supabase Storage bucket named 'images'
+      const { data, error } = await supabase.storage
+        .from('images')
+        .upload(fileName, file);
+        
+      if (error) throw error;
+      
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('images')
+        .getPublicUrl(fileName);
+        
+      if (editingProduct) {
+          setEditingProduct({ ...editingProduct, image: urlData.publicUrl });
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert('Erro no upload. Verifique se o bucket "images" existe e é público no Supabase.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -890,8 +922,43 @@ export default function App() {
                             </div>
                          </div>
                          <div>
-                            <label className="block text-xs text-gray-500 mb-1">Imagem URL (Imgur)</label>
-                            <input className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white" value={editingProduct.image || ''} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} placeholder="https://..." />
+                            <label className="block text-xs text-gray-500 mb-1">Imagem</label>
+                            
+                            <div className="bg-white/5 border border-white/10 rounded-lg p-4 flex items-center gap-4">
+                                {editingProduct.image && (
+                                    <div className="w-16 h-16 rounded bg-black/50 overflow-hidden shrink-0 border border-white/10">
+                                        <img src={editingProduct.image} className="w-full h-full object-cover" alt="Preview" />
+                                    </div>
+                                )}
+                                
+                                <div className="flex-1">
+                                    {isUploading ? (
+                                        <div className="flex items-center gap-2 text-ios-blue animate-pulse">
+                                            <Loader className="w-4 h-4 animate-spin" />
+                                            <span className="text-sm">Enviando imagem...</span>
+                                        </div>
+                                    ) : (
+                                        <label className="cursor-pointer flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm transition-colors w-fit">
+                                            <Upload className="w-4 h-4" />
+                                            Escolher Imagem
+                                            <input 
+                                                type="file" 
+                                                accept="image/*" 
+                                                className="hidden" 
+                                                onChange={handleImageUpload} 
+                                            />
+                                        </label>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            {/* Fallback manual URL input if needed, or remove if strict upload only */}
+                            <input 
+                                className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-white text-xs mt-2" 
+                                value={editingProduct.image || ''} 
+                                onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} 
+                                placeholder="Ou cole a URL manualmente..." 
+                            />
                          </div>
                          <div>
                             <label className="block text-xs text-gray-500 mb-1">Descrição</label>
@@ -929,7 +996,7 @@ export default function App() {
                                 })}
                             </div>
                          </div>
-                         <button onClick={handleSaveProduct} className="w-full bg-ios-blue text-white font-bold py-4 rounded-xl mt-4">Salvar Produto</button>
+                         <button disabled={isUploading} onClick={handleSaveProduct} className="w-full bg-ios-blue text-white font-bold py-4 rounded-xl mt-4 disabled:opacity-50">Salvar Produto</button>
                     </div>
                 </div>
             )}
