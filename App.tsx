@@ -11,7 +11,40 @@ import {
   ALL_COLORS,
   CheckoutData
 } from './types';
-import { ShoppingBag, X, Check, Lock, Grid, Tag, Settings, Plus, Trash2, Edit2, Search } from 'lucide-react';
+import { ShoppingBag, X, Check, Lock, Grid, Tag, Settings, Plus, Trash2, Edit2, Search, Loader } from 'lucide-react';
+import { supabase } from './supabase';
+
+// --- Helper Functions for DB Mapping ---
+// DB uses snake_case, App uses camelCase
+
+const mapProductFromDB = (p: any): Product => ({
+  id: p.id,
+  name: p.name,
+  price: Number(p.price),
+  promoPrice: Number(p.promo_price || 0),
+  category: p.category,
+  colors: Array.isArray(p.colors) ? p.colors : [],
+  sizes: Array.isArray(p.sizes) ? p.sizes : [],
+  icon: p.icon || '✨',
+  image: p.image,
+  description: p.description || '',
+  visible: p.visible ?? true,
+  isPromotion: p.is_promotion ?? false
+});
+
+const mapProductToDB = (p: Partial<Product>) => ({
+  name: p.name,
+  price: p.price,
+  promo_price: p.promoPrice,
+  category: p.category,
+  colors: p.colors,
+  sizes: p.sizes,
+  icon: p.icon,
+  image: p.image,
+  description: p.description,
+  visible: p.visible,
+  is_promotion: p.isPromotion
+});
 
 // --- Helper Components ---
 
@@ -39,6 +72,7 @@ const Modal: React.FC<{
 
 export default function App() {
   // -- State --
+  const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -63,31 +97,62 @@ export default function App() {
   const [checkoutStep, setCheckoutStep] = useState(0);
   const [checkoutData, setCheckoutData] = useState<CheckoutData>({ name: '', address: '', payment: '' });
 
-  // -- Initialization & Persistence --
+  // -- Initialization --
 
   useEffect(() => {
-    // Load from local storage or defaults
-    const loadData = () => {
-      const storedProds = localStorage.getItem('belle_products');
-      const storedCats = localStorage.getItem('belle_categories');
-      const storedCoupons = localStorage.getItem('belle_coupons');
-      const storedSettings = localStorage.getItem('belle_settings');
-      const storedCart = localStorage.getItem('belle_cart');
+    // 1. Load Cart from LocalStorage (Session specific)
+    const storedCart = localStorage.getItem('belle_cart');
+    if (storedCart) setCart(JSON.parse(storedCart));
 
-      setProducts(storedProds ? JSON.parse(storedProds) : INITIAL_PRODUCTS);
-      setCategories(storedCats ? JSON.parse(storedCats) : INITIAL_CATEGORIES);
-      setCoupons(storedCoupons ? JSON.parse(storedCoupons) : INITIAL_COUPONS);
-      if (storedSettings) setSettings(JSON.parse(storedSettings));
-      if (storedCart) setCart(JSON.parse(storedCart));
-    };
-    loadData();
+    // 2. Fetch Data from Supabase
+    fetchSupabaseData();
   }, []);
 
-  // Save changes
-  useEffect(() => localStorage.setItem('belle_products', JSON.stringify(products)), [products]);
-  useEffect(() => localStorage.setItem('belle_categories', JSON.stringify(categories)), [categories]);
-  useEffect(() => localStorage.setItem('belle_coupons', JSON.stringify(coupons)), [coupons]);
-  useEffect(() => localStorage.setItem('belle_settings', JSON.stringify(settings)), [settings]);
+  const fetchSupabaseData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch Products
+      const { data: prodData } = await supabase.from('products').select('*').order('id');
+      if (prodData && prodData.length > 0) {
+        setProducts(prodData.map(mapProductFromDB));
+      } else {
+        setProducts(INITIAL_PRODUCTS); // Fallback if DB empty
+      }
+
+      // Fetch Categories
+      const { data: catData } = await supabase.from('categories').select('*').order('id');
+      if (catData && catData.length > 0) {
+        setCategories([{ id: 'all', label: 'Todos' }, ...catData]);
+      } else {
+        setCategories(INITIAL_CATEGORIES);
+      }
+
+      // Fetch Coupons
+      const { data: coupData } = await supabase.from('coupons').select('*');
+      if (coupData && coupData.length > 0) {
+        setCoupons(coupData);
+      } else {
+        setCoupons(INITIAL_COUPONS);
+      }
+
+      // Fetch Settings
+      const { data: setData } = await supabase.from('site_settings').select('*').single();
+      if (setData) {
+        setSettings({ collectionTitle: setData.collection_title || "Nova Coleção" });
+      }
+
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      // Fallback to initial constants if everything fails
+      if (products.length === 0) setProducts(INITIAL_PRODUCTS);
+      if (categories.length === 0) setCategories(INITIAL_CATEGORIES);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Save Cart Changes Locally
   useEffect(() => localStorage.setItem('belle_cart', JSON.stringify(cart)), [cart]);
 
   // -- Computed --
@@ -183,41 +248,58 @@ export default function App() {
     }
   };
 
-  const handleSaveProduct = () => {
+  const handleSaveProduct = async () => {
     if (!editingProduct || !editingProduct.name) return;
-    
-    // Validate
-    const prod: Product = {
-        id: editingProduct.id || (products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1),
-        name: editingProduct.name!,
+
+    // Optimistic Update
+    const tempId = editingProduct.id || Date.now();
+    const newProductState = {
+        ...editingProduct,
+        id: tempId,
         price: Number(editingProduct.price) || 0,
         promoPrice: Number(editingProduct.promoPrice) || 0,
-        category: editingProduct.category || 'conjuntos',
         colors: editingProduct.colors || [],
         sizes: editingProduct.sizes || ['P', 'M', 'G'],
-        icon: editingProduct.icon || '✨',
-        image: editingProduct.image || '',
-        description: editingProduct.description || '',
         visible: editingProduct.visible !== undefined ? editingProduct.visible : true,
         isPromotion: editingProduct.isPromotion || false
-    };
+    } as Product;
 
     if (editingProduct.id) {
-        setProducts(prev => prev.map(p => p.id === prod.id ? prod : p));
+        setProducts(prev => prev.map(p => p.id === editingProduct.id ? newProductState : p));
     } else {
-        setProducts(prev => [...prev, prod]);
+        setProducts(prev => [...prev, newProductState]);
     }
+
     setEditingProduct(null);
+
+    // DB Sync
+    const dbPayload = mapProductToDB(newProductState);
+    if (editingProduct.id) {
+        await supabase.from('products').update(dbPayload).eq('id', editingProduct.id);
+    } else {
+        const { data } = await supabase.from('products').insert(dbPayload).select().single();
+        if (data) {
+             // Replace optimistic ID with real ID
+             setProducts(prev => prev.map(p => p.id === tempId ? mapProductFromDB(data) : p));
+        }
+    }
   };
 
-  const deleteProduct = (id: number) => {
+  const deleteProduct = async (id: number) => {
     if (window.confirm("Tem certeza que deseja excluir?")) {
-        setProducts(prev => prev.filter(p => p.id !== id));
-        setEditingProduct(null);
+        setProducts(prev => prev.filter(p => p.id !== id)); // Optimistic
+        await supabase.from('products').delete().eq('id', id);
     }
   }
 
-  // -- Sub-Components (Inline for single-file XML requirement simplicity) --
+  const handleSaveSettings = async () => {
+     // Assuming single row with ID 1 or UPSERT strategy
+     // First try to update
+     const { error } = await supabase.from('site_settings').upsert({ id: 1, collection_title: settings.collectionTitle });
+     if (error) console.error(error);
+  }
+  
+  // -- Sub-Components (Inline) --
 
   const ProductCard: React.FC<{ product: Product; isPromo?: boolean }> = ({ product, isPromo = false }) => (
     <div 
@@ -397,7 +479,7 @@ export default function App() {
         {/* Video Visual */}
         <div className="mt-16 relative h-[400px] md:h-[500px] w-full rounded-3xl overflow-hidden bg-ios-card/50 animate-fade-in shadow-2xl border border-white/10 backdrop-blur-sm" style={{ animationDelay: '0.2s' }}>
              <video autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-80">
-                <source src="https://i.imgur.com/hfHisyM.mp4" type="video/mp4" />
+                <source src="https://i.imgur.com/bxSSUjP.mp4" type="video/mp4" />
              </video>
              <div className="absolute inset-0 bg-black/20"></div>
              <div className="absolute inset-0 flex items-center justify-center">
@@ -423,29 +505,37 @@ export default function App() {
         </div>
       </div>
 
-      {/* Promotions */}
-      {promoProducts.length > 0 && (
-        <section className="max-w-[980px] mx-auto px-5 pt-10">
-            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2 drop-shadow-md">
-                <span className="text-ios-red">🔥</span> Ofertas Especiais
-            </h3>
-            <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x">
-                {promoProducts.map(p => <ProductCard key={p.id} product={p} isPromo />)}
-            </div>
-        </section>
-      )}
-
-      {/* Main Grid */}
-      <main className="max-w-[980px] mx-auto px-5 py-12 pb-32">
-        {promoProducts.length > 0 && <h3 className="text-xl font-bold text-white mb-6 drop-shadow-md">Catálogo</h3>}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.length > 0 ? (
-                filteredProducts.map(p => <ProductCard key={p.id} product={p} />)
-            ) : (
-                <div className="col-span-full py-20 text-center text-gray-500">Nenhum produto nesta categoria.</div>
-            )}
+      {loading ? (
+        <div className="py-20 text-center flex justify-center items-center">
+            <Loader className="w-8 h-8 animate-spin text-ios-blue" />
         </div>
-      </main>
+      ) : (
+        <>
+            {/* Promotions */}
+            {promoProducts.length > 0 && (
+                <section className="max-w-[980px] mx-auto px-5 pt-10">
+                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2 drop-shadow-md">
+                        <span className="text-ios-red">🔥</span> Ofertas Especiais
+                    </h3>
+                    <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x">
+                        {promoProducts.map(p => <ProductCard key={p.id} product={p} isPromo />)}
+                    </div>
+                </section>
+            )}
+
+            {/* Main Grid */}
+            <main className="max-w-[980px] mx-auto px-5 py-12 pb-32">
+                {promoProducts.length > 0 && <h3 className="text-xl font-bold text-white mb-6 drop-shadow-md">Catálogo</h3>}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredProducts.length > 0 ? (
+                        filteredProducts.map(p => <ProductCard key={p.id} product={p} />)
+                    ) : (
+                        <div className="col-span-full py-20 text-center text-gray-500">Nenhum produto nesta categoria.</div>
+                    )}
+                </div>
+            </main>
+        </>
+      )}
 
       {/* Footer */}
       <footer className="bg-ios-card/80 backdrop-blur-lg py-20 text-center border-t border-white/5 relative z-10">
@@ -717,7 +807,9 @@ export default function App() {
                                             className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-ios-blue outline-none" 
                                             value={settings.collectionTitle}
                                             onChange={(e) => setSettings({...settings, collectionTitle: e.target.value})}
+                                            onBlur={handleSaveSettings}
                                         />
+                                        <p className="text-xs text-gray-500 mt-2">Alterações são salvas automaticamente ao sair do campo.</p>
                                     </div>
                                 </div>
                             )}
@@ -729,16 +821,29 @@ export default function App() {
                                         {categories.map(c => (
                                             <div key={c.id} className="bg-white/5 p-3 rounded-lg text-white flex justify-between">
                                                 <span>{c.label}</span>
-                                                {c.id !== 'all' && <button onClick={() => setCategories(p => p.filter(x => x.id !== c.id))} className="text-red-500 text-xs">Remover</button>}
+                                                {c.id !== 'all' && (
+                                                    <button 
+                                                        onClick={async () => {
+                                                            setCategories(p => p.filter(x => x.id !== c.id));
+                                                            await supabase.from('categories').delete().eq('id', c.id);
+                                                        }} 
+                                                        className="text-red-500 text-xs"
+                                                    >
+                                                        Remover
+                                                    </button>
+                                                )}
                                             </div>
                                         ))}
                                         <div className="flex gap-2 pt-4">
                                             <input id="new-cat-label" placeholder="Nova Categoria" className="bg-white/5 border border-white/10 rounded px-3 py-2 text-white flex-1" />
                                             <button 
-                                                onClick={() => {
+                                                onClick={async () => {
                                                     const val = (document.getElementById('new-cat-label') as HTMLInputElement).value;
                                                     if(val) {
-                                                        setCategories([...categories, { id: val.toLowerCase().replace(/\s/g, '-'), label: val }]);
+                                                        const id = val.toLowerCase().replace(/\s/g, '-');
+                                                        const newCat = { id, label: val };
+                                                        setCategories([...categories, newCat]);
+                                                        await supabase.from('categories').insert(newCat);
                                                         (document.getElementById('new-cat-label') as HTMLInputElement).value = '';
                                                     }
                                                 }}
