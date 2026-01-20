@@ -85,6 +85,10 @@ export default function App() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [settings, setSettings] = useState<SiteSettings>({ collectionTitle: "Nova Coleção" });
   
+  // Settings Saving State
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [saveSettingsSuccess, setSaveSettingsSuccess] = useState(false);
+  
   // Color Management State
   const [availableColors, setAvailableColors] = useState<Color[]>(ALL_COLORS);
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
@@ -167,10 +171,13 @@ export default function App() {
         setCoupons(INITIAL_COUPONS);
       }
 
-      // Fetch Settings
-      const { data: setData } = await supabase.from('site_settings').select('*').single();
-      if (setData) {
-        setSettings({ collectionTitle: setData.collection_title || "Nova Coleção" });
+      // Fetch Settings - Robust fetch using limit instead of single to prevent crash on empty/duplicate
+      const { data: setData, error: settingsError } = await supabase.from('site_settings').select('*').limit(1);
+      
+      if (settingsError) {
+          console.error("Error fetching settings:", settingsError);
+      } else if (setData && setData.length > 0) {
+          setSettings({ collectionTitle: setData[0].collection_title || "Nova Coleção" });
       }
 
       // Fetch Sales (if admin is logged in, or purely on background)
@@ -591,26 +598,21 @@ export default function App() {
   }
 
   const handleSaveSettings = async () => {
-     // Assuming single row with ID 1 or UPSERT strategy
-     // Update
+     setIsSavingSettings(true);
+     setSaveSettingsSuccess(false);
+     
+     // Update with explicit ID 1 to ensure singleton pattern
      const { error } = await supabase.from('site_settings').upsert({ id: 1, collection_title: settings.collectionTitle });
+     
+     setIsSavingSettings(false);
+
      if (error) {
-        console.error(error);
-        alert('Erro ao salvar configurações.');
+        console.error("Error saving settings:", error);
+        alert('Erro ao salvar configurações: ' + error.message);
      } else {
-        // Visual feedback
-        const btn = document.getElementById('btn-save-settings');
-        if (btn) {
-            const original = btn.innerText;
-            btn.innerText = 'Salvo com Sucesso!';
-            btn.classList.add('bg-green-600', 'text-white');
-            btn.classList.remove('bg-ios-blue');
-            setTimeout(() => {
-                btn.innerText = original;
-                btn.classList.remove('bg-green-600', 'text-white');
-                btn.classList.add('bg-ios-blue');
-            }, 2000);
-        }
+        setSaveSettingsSuccess(true);
+        // Clear success message after 2s
+        setTimeout(() => setSaveSettingsSuccess(false), 2000);
      }
   }
   
@@ -991,9 +993,9 @@ export default function App() {
       {/* Cart Sidebar */}
       <div className={`fixed inset-y-0 right-0 w-full md:w-[400px] bg-ios-card/95 backdrop-blur-xl shadow-2xl z-50 transform transition-transform duration-500 border-l border-white/5 ${isCartOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="h-full flex flex-col">
-            <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between bg-white/5 backdrop-blur-md sticky top-0 z-10">
+            <div className="px-6 py-5 border-b border-white/5 flex items-center justify-center relative bg-white/5 backdrop-blur-md sticky top-0 z-10">
                 <h2 className="text-lg font-semibold text-white">Sacola</h2>
-                <button onClick={() => setIsCartOpen(false)} className="text-gray-400 hover:text-white bg-white/10 rounded-full p-1.5 transition-colors">
+                <button onClick={() => setIsCartOpen(false)} className="absolute right-6 text-gray-400 hover:text-white bg-white/10 rounded-full p-1.5 transition-colors">
                     <X className="w-5 h-5" />
                 </button>
             </div>
@@ -1509,10 +1511,22 @@ export default function App() {
                                         <button 
                                             id="btn-save-settings"
                                             onClick={handleSaveSettings}
-                                            className="mt-4 bg-ios-blue text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-600 transition-all active:scale-95 flex items-center gap-2"
+                                            disabled={isSavingSettings}
+                                            className={`mt-4 font-bold py-3 px-6 rounded-xl transition-all active:scale-95 flex items-center gap-2 ${saveSettingsSuccess ? 'bg-ios-green text-white' : 'bg-ios-blue text-white hover:bg-blue-600'} disabled:opacity-50 disabled:cursor-not-allowed`}
                                         >
-                                            <Save className="w-4 h-4" />
-                                            Salvar Alterações
+                                            {isSavingSettings ? (
+                                                <>
+                                                    <Loader className="w-4 h-4 animate-spin" /> Salvando...
+                                                </>
+                                            ) : saveSettingsSuccess ? (
+                                                <>
+                                                    <Check className="w-4 h-4" /> Salvo com Sucesso!
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Save className="w-4 h-4" /> Salvar Alterações
+                                                </>
+                                            )}
                                         </button>
                                     </div>
                                 </div>
