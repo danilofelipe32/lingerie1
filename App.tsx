@@ -13,7 +13,7 @@ import {
   StockVariant,
   Sale
 } from './types';
-import { ShoppingBag, X, Check, Lock, Grid, Tag, Settings, Plus, Trash2, Edit2, Search, Loader, Upload, Palette, Save, TrendingUp, AlertTriangle, Package, DollarSign, BarChart3, Eye, EyeOff, Calendar, User, CreditCard, Filter, RefreshCw } from 'lucide-react';
+import { ShoppingBag, X, Check, Lock, Grid, Tag, Settings, Plus, Trash2, Edit2, Search, Loader, Upload, Palette, Save, TrendingUp, AlertTriangle, Package, DollarSign, BarChart3, Eye, EyeOff, Calendar, User, CreditCard, Filter, RefreshCw, Sparkles } from 'lucide-react';
 import { supabase } from './supabase';
 
 // --- Helper Functions for DB Mapping ---
@@ -32,7 +32,8 @@ const mapProductFromDB = (p: any): Product => ({
   image: p.image,
   description: p.description || '',
   visible: p.visible ?? true,
-  isPromotion: p.is_promotion ?? false
+  isPromotion: p.is_promotion ?? false,
+  isMulticolor: p.is_multicolor ?? false
 });
 
 const mapProductToDB = (p: Partial<Product>) => ({
@@ -47,7 +48,8 @@ const mapProductToDB = (p: Partial<Product>) => ({
   image: p.image,
   description: p.description,
   visible: p.visible,
-  is_promotion: p.isPromotion
+  is_promotion: p.isPromotion,
+  is_multicolor: p.isMulticolor
 });
 
 // --- Helper Components ---
@@ -548,7 +550,8 @@ export default function App() {
         sizes: sizes,
         stock: finalStock,
         visible: editingProduct.visible !== undefined ? editingProduct.visible : true,
-        isPromotion: editingProduct.isPromotion || false
+        isPromotion: editingProduct.isPromotion || false,
+        isMulticolor: editingProduct.isMulticolor || false
     } as Product;
 
     if (editingProduct.id) {
@@ -619,6 +622,13 @@ export default function App() {
             )}
             
             {isPromo && <div className="absolute top-3 right-3 bg-ios-red text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide">Promo</div>}
+            
+            {/* Multicolor Tag */}
+            {product.isMulticolor && (
+                <div className={`absolute top-3 ${isPromo ? 'left-3' : 'left-3'} bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-wide shadow-lg z-10 animate-fade-in`}>
+                    Multicolor
+                </div>
+            )}
             
             <div className="absolute bottom-3 left-3 flex flex-wrap gap-2 items-center max-w-[calc(100%-24px)]">
                  <div className="bg-black/80 backdrop-blur-md border border-white/10 px-3.5 py-1.5 rounded-full flex items-center shadow-lg transition-transform group-hover:scale-105">
@@ -707,6 +717,11 @@ export default function App() {
                         ) : (
                             <span className="text-9xl drop-shadow-2xl animate-scale-in">{selectedProduct.icon}</span>
                         )}
+                        {selectedProduct.isMulticolor && (
+                            <div className="absolute top-4 right-4 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wide shadow-lg">
+                                Multicolor
+                            </div>
+                        )}
                     </div>
                     
                     <div className="p-8 flex flex-col flex-1">
@@ -783,6 +798,9 @@ export default function App() {
                                                     )}
                                                     {rp.isPromotion && (
                                                         <span className="absolute top-1 right-1 bg-ios-red text-white text-[8px] font-bold px-1.5 py-0.5 rounded">PROMO</span>
+                                                    )}
+                                                    {rp.isMulticolor && (
+                                                        <div className="absolute top-1 left-1 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide">Multi</div>
                                                     )}
                                                 </div>
                                                 <p className="text-xs font-medium text-white line-clamp-1">{rp.name}</p>
@@ -1684,13 +1702,29 @@ export default function App() {
                          <div className="bg-white/5 p-4 rounded-xl border border-white/10">
                             <div className="flex justify-between items-center mb-3">
                                 <label className="text-sm font-bold text-white">Cores & Estoque</label>
-                                <button 
-                                    onClick={() => setIsColorPickerOpen(!isColorPickerOpen)} 
-                                    className="text-xs flex items-center gap-1 text-ios-blue hover:text-white transition-colors font-medium bg-ios-blue/10 px-2 py-1 rounded-full border border-ios-blue/20"
-                                >
-                                    {isColorPickerOpen ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                                    Nova Cor
-                                </button>
+                                <div className="flex items-center gap-3">
+                                    {/* Multicolor Toggle */}
+                                    <label className="flex items-center gap-2 cursor-pointer bg-white/5 px-2 py-1 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={editingProduct.isMulticolor || false}
+                                            onChange={e => setEditingProduct({...editingProduct, isMulticolor: e.target.checked})}
+                                            className="hidden"
+                                        />
+                                        <div className={`w-8 h-4 rounded-full p-0.5 transition-colors relative ${editingProduct.isMulticolor ? 'bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500' : 'bg-gray-600'}`}>
+                                            <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform ${editingProduct.isMulticolor ? 'translate-x-4' : 'translate-x-0'}`} />
+                                        </div>
+                                        <span className="text-[10px] font-bold text-gray-300 uppercase">Multicolor</span>
+                                    </label>
+
+                                    <button 
+                                        onClick={() => setIsColorPickerOpen(!isColorPickerOpen)} 
+                                        className="text-xs flex items-center gap-1 text-ios-blue hover:text-white transition-colors font-medium bg-ios-blue/10 px-2 py-1 rounded-full border border-ios-blue/20"
+                                    >
+                                        {isColorPickerOpen ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                                        Nova Cor
+                                    </button>
+                                </div>
                             </div>
                             
                             {/* Color Picker Logic (Same as before) */}

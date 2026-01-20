@@ -12,6 +12,7 @@ export interface Product {
   description: string;
   visible: boolean;
   isPromotion: boolean;
+  isMulticolor?: boolean; // Novo campo Multicolor
 }
 
 export interface StockVariant {
@@ -94,7 +95,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     icon: "🖤", 
     description: "Sofisticação em cada detalhe. Renda francesa premium.", 
     visible: true, 
-    isPromotion: false 
+    isPromotion: false,
+    isMulticolor: false
   },
   { 
     id: 2, 
@@ -117,7 +119,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     icon: "✨", 
     description: "Acabamento em veludo. Modelagem perfeita.", 
     visible: true, 
-    isPromotion: false 
+    isPromotion: false,
+    isMulticolor: false 
   }
 ];
 
