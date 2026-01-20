@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Product, 
   Category, 
@@ -519,14 +519,27 @@ export default function App() {
   const ProductDetailModal = () => {
     const [color, setColor] = useState(selectedProduct?.colors[0]);
     const [size, setSize] = useState(selectedProduct?.sizes[0]);
+    const modalScrollRef = useRef<HTMLDivElement>(null);
     
     // Update local state when selected product changes
     useEffect(() => {
         if (selectedProduct) {
             setColor(selectedProduct.colors[0]);
             setSize(selectedProduct.sizes[0]);
+            // Scroll to top
+            if(modalScrollRef.current) {
+                modalScrollRef.current.scrollTop = 0;
+            }
         }
     }, [selectedProduct]);
+
+    // Related Products Logic
+    const relatedProducts = useMemo(() => {
+        if (!selectedProduct) return [];
+        return products
+            .filter(p => p.category === selectedProduct.category && p.id !== selectedProduct.id && p.visible)
+            .slice(0, 4);
+    }, [selectedProduct, products]);
 
     if (!selectedProduct) return null;
 
@@ -540,7 +553,7 @@ export default function App() {
         <div className="fixed inset-0 z-50 overflow-hidden" role="dialog">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setSelectedProduct(null)} />
             <div className="absolute inset-y-0 right-0 max-w-md w-full flex pointer-events-none">
-                 <div className="pointer-events-auto w-full transform transition ease-in-out duration-500 sm:duration-700 bg-ios-card/95 backdrop-blur-xl shadow-2xl h-full flex flex-col overflow-y-scroll animate-fade-in">
+                 <div ref={modalScrollRef} className="pointer-events-auto w-full transform transition ease-in-out duration-500 sm:duration-700 bg-ios-card/95 backdrop-blur-xl shadow-2xl h-full flex flex-col overflow-y-scroll animate-fade-in no-scrollbar">
                     <div className="relative h-[40vh] bg-gradient-to-b from-[#2c2c2e] to-ios-card flex items-center justify-center shrink-0">
                         <button onClick={() => setSelectedProduct(null)} className="absolute top-4 left-4 bg-black/20 backdrop-blur-md p-2 rounded-full text-white hover:bg-black/40 transition-colors z-10">
                             <X className="w-6 h-6" />
@@ -606,6 +619,37 @@ export default function App() {
                             <div className="bg-[#2c2c2e] p-4 rounded-xl">
                                 <p className="text-sm text-gray-400 leading-relaxed">{selectedProduct.description}</p>
                             </div>
+
+                            {/* Related Products Section */}
+                            {relatedProducts.length > 0 && (
+                                <div className="pt-2 border-t border-white/5">
+                                    <h4 className="text-white font-bold text-sm mb-4">Você também pode gostar</h4>
+                                    <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                                        {relatedProducts.map(rp => (
+                                            <div 
+                                                key={rp.id}
+                                                onClick={() => setSelectedProduct(rp)}
+                                                className="min-w-[120px] w-[120px] bg-white/5 rounded-xl p-2 cursor-pointer hover:bg-white/10 transition-colors"
+                                            >
+                                                <div className="aspect-[4/5] rounded-lg overflow-hidden bg-black/20 mb-2 relative">
+                                                    {rp.image ? (
+                                                        <img src={rp.image} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <span className="text-2xl flex items-center justify-center h-full w-full">{rp.icon}</span>
+                                                    )}
+                                                    {rp.isPromotion && (
+                                                        <span className="absolute top-1 right-1 bg-ios-red text-white text-[8px] font-bold px-1.5 py-0.5 rounded">PROMO</span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs font-medium text-white line-clamp-1">{rp.name}</p>
+                                                <p className="text-[10px] text-gray-400">
+                                                    R$ {(rp.isPromotion && rp.promoPrice > 0 ? rp.promoPrice : rp.price).toFixed(2).replace('.', ',')}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="mt-8 pt-6 border-t border-white/5">
