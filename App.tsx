@@ -11,7 +11,8 @@ import {
   ALL_COLORS,
   CheckoutData,
   StockVariant,
-  Sale
+  Sale,
+  Color
 } from './types';
 import { ShoppingBag, X, Check, Lock, Grid, Tag, Settings, Plus, Trash2, Edit2, Search, Loader, Upload, Palette, Save, TrendingUp, AlertTriangle, Package, DollarSign, BarChart3, Eye, EyeOff, Calendar, User, CreditCard, Filter, RefreshCw, Sparkles } from 'lucide-react';
 import { supabase } from './supabase';
@@ -85,7 +86,7 @@ export default function App() {
   const [settings, setSettings] = useState<SiteSettings>({ collectionTitle: "Nova Coleção" });
   
   // Color Management State
-  const [availableColors, setAvailableColors] = useState<{name: string, hex: string}[]>(ALL_COLORS);
+  const [availableColors, setAvailableColors] = useState<Color[]>(ALL_COLORS);
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [newColorData, setNewColorData] = useState({ name: '', hex: '#FF0000' });
 
@@ -122,23 +123,7 @@ export default function App() {
     const storedCart = localStorage.getItem('belle_cart');
     if (storedCart) setCart(JSON.parse(storedCart));
 
-    // 2. Load Custom Colors from LocalStorage
-    const storedColors = localStorage.getItem('belle_custom_colors');
-    if (storedColors) {
-        try {
-            const parsedColors = JSON.parse(storedColors);
-            // Merge custom colors with default colors, avoiding duplicates by name
-            setAvailableColors(prev => {
-                const existingNames = new Set(prev.map(c => c.name.toLowerCase()));
-                const newColors = parsedColors.filter((c: any) => !existingNames.has(c.name.toLowerCase()));
-                return [...prev, ...newColors];
-            });
-        } catch (e) {
-            console.error("Failed to load custom colors", e);
-        }
-    }
-
-    // 3. Fetch Data from Supabase
+    // 2. Fetch Data from Supabase
     fetchSupabaseData();
   }, []);
 
@@ -162,6 +147,16 @@ export default function App() {
         setCategories([{ id: 'all', label: 'Todos' }, ...customCategories]);
       } else {
         setCategories(INITIAL_CATEGORIES);
+      }
+
+      // Fetch Colors (New: Get from DB)
+      const { data: customColors } = await supabase.from('colors').select('*');
+      if (customColors) {
+          setAvailableColors(prev => {
+              const currentNames = new Set(prev.map(c => c.name.toLowerCase()));
+              const toAdd = customColors.filter((c: any) => !currentNames.has(c.name.toLowerCase()));
+              return [...prev, ...toAdd];
+          });
       }
 
       // Fetch Coupons
@@ -415,7 +410,7 @@ export default function App() {
     }
   };
 
-  const handleSaveNewColor = () => {
+  const handleSaveNewColor = async () => {
     if (!newColorData.name) {
         alert("Digite o nome da cor");
         return;
@@ -428,13 +423,18 @@ export default function App() {
     }
 
     const newColor = { ...newColorData };
-    const updatedColors = [...availableColors, newColor];
     
-    setAvailableColors(updatedColors);
-    
-    // Persist custom colors to localStorage (filtering out defaults would be better, but saving all is easier for now to ensure consistency)
-    const customColors = updatedColors.filter(c => !ALL_COLORS.some(ac => ac.name === c.name));
-    localStorage.setItem('belle_custom_colors', JSON.stringify(customColors));
+    // Save to Supabase
+    const { error } = await supabase.from('colors').insert(newColor);
+
+    if (error) {
+        console.error('Error saving color:', error);
+        alert('Erro ao salvar cor no banco de dados. Verifique se a tabela "colors" existe no Supabase.');
+        return;
+    }
+
+    // Update Local State
+    setAvailableColors(prev => [...prev, newColor]);
     
     setIsColorPickerOpen(false);
     setNewColorData({ name: '', hex: '#FF0000' });

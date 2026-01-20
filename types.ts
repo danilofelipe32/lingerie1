@@ -31,6 +31,11 @@ export interface Coupon {
   discount: number;
 }
 
+export interface Color {
+  name: string;
+  hex: string;
+}
+
 export interface CartItem extends Product {
   selectedColor: string;
   selectedSize: string;
@@ -58,7 +63,7 @@ export interface Sale {
   items: CartItem[]; // Itens salvos como JSON
 }
 
-export const ALL_COLORS = [
+export const ALL_COLORS: Color[] = [
   { name: "Preto", hex: "#000000" },
   { name: "Branco", hex: "#FFFFFF" },
   { name: "Vermelho", hex: "#C21807" },   // Vermelho Sangue
