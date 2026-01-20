@@ -511,7 +511,24 @@ export default function App() {
         <div className="p-4">
             {!isPromo && <p className="text-xs text-ios-blue font-semibold uppercase tracking-wide mb-1">{categories.find(c => c.id === product.category)?.label}</p>}
             <h3 className="text-white font-semibold text-lg leading-tight mb-1 line-clamp-1">{product.name}</h3>
-            <p className="text-gray-500 text-xs line-clamp-2">{product.description}</p>
+            <p className="text-gray-500 text-xs line-clamp-2 mb-2">{product.description}</p>
+            
+            {/* Color Tags on Card */}
+            {product.colors && product.colors.length > 0 && (
+                <div className="flex items-center gap-1.5 mt-2">
+                    {product.colors.map(c => (
+                        <div 
+                            key={c}
+                            className="w-2.5 h-2.5 rounded-full border border-white/10 shadow-[0_0_2px_rgba(0,0,0,0.5)]"
+                            style={{ backgroundColor: availableColors.find(ac => ac.name === c)?.hex || '#333' }}
+                            title={c}
+                        />
+                    ))}
+                    {product.colors.length > 5 && (
+                        <span className="text-[9px] text-gray-500">+{product.colors.length - 5}</span>
+                    )}
+                </div>
+            )}
         </div>
     </div>
   )};
