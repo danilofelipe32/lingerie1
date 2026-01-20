@@ -6,11 +6,18 @@ export interface Product {
   category: string;
   colors: string[];
   sizes: string[];
+  stock: StockVariant[]; // Novo campo de estoque
   icon: string;
   image?: string;
   description: string;
   visible: boolean;
   isPromotion: boolean;
+}
+
+export interface StockVariant {
+  color: string;
+  size: string;
+  quantity: number;
 }
 
 export interface Category {
@@ -62,7 +69,17 @@ export const INITIAL_PRODUCTS: Product[] = [
     promoPrice: 0, 
     category: "conjuntos", 
     colors: ["Preto", "Vinho"], 
-    sizes: ["P", "M", "G", "GG"], 
+    sizes: ["P", "M", "G", "GG"],
+    stock: [
+        { color: "Preto", size: "P", quantity: 5 },
+        { color: "Preto", size: "M", quantity: 5 },
+        { color: "Preto", size: "G", quantity: 5 },
+        { color: "Preto", size: "GG", quantity: 5 },
+        { color: "Vinho", size: "P", quantity: 5 },
+        { color: "Vinho", size: "M", quantity: 5 },
+        { color: "Vinho", size: "G", quantity: 5 },
+        { color: "Vinho", size: "GG", quantity: 5 }
+    ],
     icon: "🖤", 
     description: "Sofisticação em cada detalhe. Renda francesa premium.", 
     visible: true, 
@@ -76,6 +93,16 @@ export const INITIAL_PRODUCTS: Product[] = [
     category: "sutias", 
     colors: ["Bordeaux", "Preto"], 
     sizes: ["P", "M", "G", "GG"], 
+    stock: [
+        { color: "Bordeaux", size: "P", quantity: 3 },
+        { color: "Bordeaux", size: "M", quantity: 0 }, // Exemplo sem estoque
+        { color: "Bordeaux", size: "G", quantity: 3 },
+        { color: "Bordeaux", size: "GG", quantity: 3 },
+        { color: "Preto", size: "P", quantity: 3 },
+        { color: "Preto", size: "M", quantity: 3 },
+        { color: "Preto", size: "G", quantity: 3 },
+        { color: "Preto", size: "GG", quantity: 3 }
+    ],
     icon: "✨", 
     description: "Acabamento em veludo. Modelagem perfeita.", 
     visible: true, 

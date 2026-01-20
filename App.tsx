@@ -9,9 +9,10 @@ import {
   INITIAL_CATEGORIES, 
   INITIAL_COUPONS, 
   ALL_COLORS,
-  CheckoutData
+  CheckoutData,
+  StockVariant
 } from './types';
-import { ShoppingBag, X, Check, Lock, Grid, Tag, Settings, Plus, Trash2, Edit2, Search, Loader, Upload } from 'lucide-react';
+import { ShoppingBag, X, Check, Lock, Grid, Tag, Settings, Plus, Trash2, Edit2, Search, Loader, Upload, Palette, Save, TrendingUp, AlertTriangle, Package, DollarSign, BarChart3 } from 'lucide-react';
 import { supabase } from './supabase';
 
 // --- Helper Functions for DB Mapping ---
@@ -25,6 +26,7 @@ const mapProductFromDB = (p: any): Product => ({
   category: p.category,
   colors: Array.isArray(p.colors) ? p.colors : [],
   sizes: Array.isArray(p.sizes) ? p.sizes : [],
+  stock: Array.isArray(p.stock) ? p.stock : [], // Map stock
   icon: p.icon || '✨',
   image: p.image,
   description: p.description || '',
@@ -39,6 +41,7 @@ const mapProductToDB = (p: Partial<Product>) => ({
   category: p.category,
   colors: p.colors,
   sizes: p.sizes,
+  stock: p.stock, // Save stock
   icon: p.icon,
   image: p.image,
   description: p.description,
@@ -78,6 +81,11 @@ export default function App() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [settings, setSettings] = useState<SiteSettings>({ collectionTitle: "Nova Coleção" });
   
+  // Color Management State
+  const [availableColors, setAvailableColors] = useState<{name: string, hex: string}[]>(ALL_COLORS);
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+  const [newColorData, setNewColorData] = useState({ name: '', hex: '#FF0000' });
+
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
@@ -89,7 +97,7 @@ export default function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
-  const [adminTab, setAdminTab] = useState<'products' | 'categories' | 'coupons' | 'settings'>('products');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'categories' | 'coupons' | 'settings'>('dashboard');
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -105,7 +113,23 @@ export default function App() {
     const storedCart = localStorage.getItem('belle_cart');
     if (storedCart) setCart(JSON.parse(storedCart));
 
-    // 2. Fetch Data from Supabase
+    // 2. Load Custom Colors from LocalStorage
+    const storedColors = localStorage.getItem('belle_custom_colors');
+    if (storedColors) {
+        try {
+            const parsedColors = JSON.parse(storedColors);
+            // Merge custom colors with default colors, avoiding duplicates by name
+            setAvailableColors(prev => {
+                const existingNames = new Set(prev.map(c => c.name.toLowerCase()));
+                const newColors = parsedColors.filter((c: any) => !existingNames.has(c.name.toLowerCase()));
+                return [...prev, ...newColors];
+            });
+        } catch (e) {
+            console.error("Failed to load custom colors", e);
+        }
+    }
+
+    // 3. Fetch Data from Supabase
     fetchSupabaseData();
   }, []);
 
@@ -188,9 +212,31 @@ export default function App() {
     }, 0);
   }, [cart]);
 
+  // Dashboard Metrics
+  const dashboardMetrics = useMemo(() => {
+      const totalProducts = products.length;
+      const totalStock = products.reduce((acc, p) => acc + (p.stock?.reduce((sAcc, s) => sAcc + s.quantity, 0) || 0), 0);
+      const totalValue = products.reduce((acc, p) => {
+          const productStock = p.stock?.reduce((sAcc, s) => sAcc + s.quantity, 0) || 0;
+          return acc + (productStock * (p.isPromotion && p.promoPrice > 0 ? p.promoPrice : p.price));
+      }, 0);
+      const lowStockProducts = products.filter(p => (p.stock?.reduce((sAcc, s) => sAcc + s.quantity, 0) || 0) < 5).length;
+      return { totalProducts, totalStock, totalValue, lowStockProducts };
+  }, [products]);
+
+
   // -- Handlers --
 
   const addToCart = (product: Product, color: string, size: string) => {
+    // Check Stock
+    const variantStock = product.stock?.find(s => s.color === color && s.size === size)?.quantity || 0;
+    const currentInCart = cart.find(i => i.id === product.id && i.selectedColor === color && i.selectedSize === size)?.quantity || 0;
+
+    if (currentInCart + 1 > variantStock) {
+        alert("Desculpe, estoque insuficiente para esta combinação.");
+        return;
+    }
+
     setCart(prev => {
       const existing = prev.find(i => i.id === product.id && i.selectedColor === color && i.selectedSize === size);
       if (existing) {
@@ -216,12 +262,12 @@ export default function App() {
     }
   };
 
-  const handleCheckoutSubmit = (e: React.FormEvent) => {
+  const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (checkoutStep < 2) {
       setCheckoutStep(prev => prev + 1);
     } else {
-      // Send to WhatsApp
+      // 1. Send to WhatsApp
       const whatsappNumber = "5584933004076";
       let msg = `*Pedido NQ Secrets*\n\n👤 *Cliente:* ${checkoutData.name}\n📍 *Endereço:* ${checkoutData.address}\n💳 *Pagamento:* ${checkoutData.payment}\n\n🛒 *ITENS:*`;
       cart.forEach(i => msg += `\n- ${i.quantity}x ${i.name} (${i.selectedSize}, ${i.selectedColor})`);
@@ -232,12 +278,69 @@ export default function App() {
       msg += `\n\n💰 *Total:* R$ ${cartTotal.toFixed(2).replace('.', ',')}`;
       
       window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
+
+      // 2. Update Stock in Supabase
+      try {
+          for (const item of cart) {
+              const product = products.find(p => p.id === item.id);
+              if (product && product.stock) {
+                  const newStock = product.stock.map(s => {
+                      if (s.color === item.selectedColor && s.size === item.selectedSize) {
+                          return { ...s, quantity: Math.max(0, s.quantity - item.quantity) };
+                      }
+                      return s;
+                  });
+                  
+                  // Update local state first for UX
+                  setProducts(prev => prev.map(p => p.id === item.id ? { ...p, stock: newStock } : p));
+                  
+                  // Update DB
+                  await supabase.from('products').update({ stock: newStock }).eq('id', item.id);
+              }
+          }
+      } catch (err) {
+          console.error("Error updating stock", err);
+      }
+
       setCart([]);
       setAppliedCoupon(null);
       setIsCheckoutOpen(false);
       setCheckoutStep(0);
       setCheckoutData({ name: '', address: '', payment: '' });
       setIsCartOpen(false);
+    }
+  };
+
+  const handleSaveNewColor = () => {
+    if (!newColorData.name) {
+        alert("Digite o nome da cor");
+        return;
+    }
+    
+    // Check for duplicates
+    if (availableColors.some(c => c.name.toLowerCase() === newColorData.name.toLowerCase())) {
+        alert("Essa cor já existe!");
+        return;
+    }
+
+    const newColor = { ...newColorData };
+    const updatedColors = [...availableColors, newColor];
+    
+    setAvailableColors(updatedColors);
+    
+    // Persist custom colors to localStorage (filtering out defaults would be better, but saving all is easier for now to ensure consistency)
+    const customColors = updatedColors.filter(c => !ALL_COLORS.some(ac => ac.name === c.name));
+    localStorage.setItem('belle_custom_colors', JSON.stringify(customColors));
+    
+    setIsColorPickerOpen(false);
+    setNewColorData({ name: '', hex: '#FF0000' });
+    
+    // Auto-select the new color if editing
+    if (editingProduct) {
+        setEditingProduct({
+            ...editingProduct,
+            colors: [...(editingProduct.colors || []), newColor.name]
+        });
     }
   };
 
@@ -289,6 +392,23 @@ export default function App() {
     const defaultCategory = categories.find(c => c.id !== 'all')?.id;
     const finalCategory = editingProduct.category || defaultCategory || 'geral';
 
+    // Ensure Stock Structure matches selected Colors/Sizes
+    let finalStock = editingProduct.stock || [];
+    const colors = editingProduct.colors || [];
+    const sizes = editingProduct.sizes || ['P', 'M', 'G']; // Default sizes if empty
+
+    // 1. Remove invalid entries (colors/sizes deselected)
+    finalStock = finalStock.filter(s => colors.includes(s.color) && sizes.includes(s.size));
+
+    // 2. Add missing entries
+    for (const c of colors) {
+        for (const s of sizes) {
+            if (!finalStock.find(item => item.color === c && item.size === s)) {
+                finalStock.push({ color: c, size: s, quantity: 0 });
+            }
+        }
+    }
+
     // Optimistic Update
     const tempId = editingProduct.id || Date.now();
     const newProductState = {
@@ -297,8 +417,9 @@ export default function App() {
         price: Number(editingProduct.price) || 0,
         promoPrice: Number(editingProduct.promoPrice) || 0,
         category: finalCategory,
-        colors: editingProduct.colors || [],
-        sizes: editingProduct.sizes || ['P', 'M', 'G'],
+        colors: colors,
+        sizes: sizes,
+        stock: finalStock,
         visible: editingProduct.visible !== undefined ? editingProduct.visible : true,
         isPromotion: editingProduct.isPromotion || false
     } as Product;
@@ -340,11 +461,21 @@ export default function App() {
   
   // -- Sub-Components (Inline) --
 
-  const ProductCard: React.FC<{ product: Product; isPromo?: boolean }> = ({ product, isPromo = false }) => (
+  const ProductCard: React.FC<{ product: Product; isPromo?: boolean }> = ({ product, isPromo = false }) => {
+    // Check if totally out of stock
+    const totalStock = product.stock?.reduce((acc, s) => acc + s.quantity, 0) || 0;
+    const isOutOfStock = totalStock === 0;
+
+    return (
     <div 
         onClick={() => setSelectedProduct(product)}
-        className={`bg-ios-card rounded-[24px] overflow-hidden group cursor-pointer border hover:bg-[#2c2c2e] transition-all ${isPromo ? 'border-ios-red/20 hover:border-ios-red/50 snap-center shrink-0 w-[240px]' : 'border-white/5 animate-scale-in'}`}
+        className={`bg-ios-card rounded-[24px] overflow-hidden group cursor-pointer border hover:bg-[#2c2c2e] transition-all relative ${isPromo ? 'border-ios-red/20 hover:border-ios-red/50 snap-center shrink-0 w-[240px]' : 'border-white/5 animate-scale-in'}`}
     >
+        {isOutOfStock && (
+            <div className="absolute inset-0 z-20 bg-black/60 flex items-center justify-center backdrop-blur-[1px]">
+                <div className="bg-red-500/80 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border border-white/20 transform -rotate-12">Esgotado</div>
+            </div>
+        )}
         <div className={`relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-[#2c2c2e] to-[#1c1c1e] ${isPromo ? 'h-[280px]' : 'aspect-[4/5]'}`}>
             {product.image ? (
                  <img src={product.image} alt={product.name} className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-110" />
@@ -375,7 +506,7 @@ export default function App() {
             <p className="text-gray-500 text-xs line-clamp-2">{product.description}</p>
         </div>
     </div>
-  );
+  )};
 
   const ProductDetailModal = () => {
     const [color, setColor] = useState(selectedProduct?.colors[0]);
@@ -392,6 +523,10 @@ export default function App() {
     if (!selectedProduct) return null;
 
     const currentPrice = (selectedProduct.isPromotion && selectedProduct.promoPrice > 0) ? selectedProduct.promoPrice : selectedProduct.price;
+    
+    // Check stock for current selection
+    const currentStock = selectedProduct.stock?.find(s => s.color === color && s.size === size)?.quantity || 0;
+    const isOutOfStock = currentStock === 0;
 
     return (
         <div className="fixed inset-0 z-50 overflow-hidden" role="dialog">
@@ -432,7 +567,7 @@ export default function App() {
                                             key={c}
                                             onClick={() => setColor(c)}
                                             className={`w-10 h-10 rounded-full border-2 transition-all ${color === c ? 'border-ios-blue scale-110' : 'border-transparent hover:border-gray-600'}`}
-                                            style={{ backgroundColor: ALL_COLORS.find(ac => ac.name === c)?.hex || '#333' }}
+                                            style={{ backgroundColor: availableColors.find(ac => ac.name === c)?.hex || '#333' }}
                                         />
                                     ))}
                                 </div>
@@ -451,6 +586,15 @@ export default function App() {
                                     ))}
                                 </div>
                             </div>
+                            
+                            {/* Stock Status */}
+                            <div className="flex items-center gap-2 text-sm">
+                                <span className={`w-2 h-2 rounded-full ${isOutOfStock ? 'bg-red-500' : 'bg-green-500'}`}></span>
+                                <span className={isOutOfStock ? 'text-red-400' : 'text-green-400'}>
+                                    {isOutOfStock ? 'Esgotado nesta variação' : `${currentStock} unidades disponíveis`}
+                                </span>
+                            </div>
+
                             <div className="bg-[#2c2c2e] p-4 rounded-xl">
                                 <p className="text-sm text-gray-400 leading-relaxed">{selectedProduct.description}</p>
                             </div>
@@ -458,10 +602,11 @@ export default function App() {
 
                         <div className="mt-8 pt-6 border-t border-white/5">
                             <button 
+                                disabled={isOutOfStock}
                                 onClick={() => color && size && addToCart(selectedProduct, color, size)}
-                                className="w-full bg-ios-blue text-white py-4 rounded-xl font-semibold text-lg hover:bg-blue-600 active:scale-95 transition-all shadow-[0_0_20px_rgba(10,132,255,0.3)]"
+                                className="w-full bg-ios-blue text-white py-4 rounded-xl font-semibold text-lg hover:bg-blue-600 active:scale-95 transition-all shadow-[0_0_20px_rgba(10,132,255,0.3)] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                             >
-                                Adicionar à Sacola
+                                {isOutOfStock ? 'Sem Estoque' : 'Adicionar à Sacola'}
                             </button>
                         </div>
                     </div>
@@ -782,6 +927,7 @@ export default function App() {
                     <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
                         <aside className="bg-ios-card/50 border-r border-white/5 p-4 flex md:flex-col gap-2 overflow-x-auto">
                             {[
+                                { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
                                 { id: 'products', label: 'Produtos', icon: Grid },
                                 { id: 'categories', label: 'Categorias', icon: Tag },
                                 { id: 'coupons', label: 'Cupons', icon: Tag },
@@ -799,6 +945,95 @@ export default function App() {
                         </aside>
                         
                         <main className="flex-1 overflow-y-auto p-6">
+                            {adminTab === 'dashboard' && (
+                                <div className="space-y-6 animate-fade-in">
+                                    <h3 className="text-2xl font-bold text-white">Visão Geral</h3>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                        <div className="bg-gradient-to-br from-blue-900/40 to-ios-card p-6 rounded-2xl border border-white/10">
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-3 bg-blue-500/20 rounded-xl">
+                                                    <Package className="w-6 h-6 text-blue-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-gray-400 text-xs uppercase tracking-wider font-bold">Total Produtos</p>
+                                                    <p className="text-2xl font-bold text-white">{dashboardMetrics.totalProducts}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-gradient-to-br from-green-900/40 to-ios-card p-6 rounded-2xl border border-white/10">
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-3 bg-green-500/20 rounded-xl">
+                                                    <TrendingUp className="w-6 h-6 text-green-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-gray-400 text-xs uppercase tracking-wider font-bold">Total em Estoque</p>
+                                                    <p className="text-2xl font-bold text-white">{dashboardMetrics.totalStock} <span className="text-xs font-normal text-gray-400">unid.</span></p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-gradient-to-br from-purple-900/40 to-ios-card p-6 rounded-2xl border border-white/10">
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-3 bg-purple-500/20 rounded-xl">
+                                                    <DollarSign className="w-6 h-6 text-purple-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-gray-400 text-xs uppercase tracking-wider font-bold">Valor em Estoque</p>
+                                                    <p className="text-2xl font-bold text-white">R$ {dashboardMetrics.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-gradient-to-br from-red-900/40 to-ios-card p-6 rounded-2xl border border-white/10">
+                                            <div className="flex items-center gap-4">
+                                                <div className="p-3 bg-red-500/20 rounded-xl">
+                                                    <AlertTriangle className="w-6 h-6 text-red-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-gray-400 text-xs uppercase tracking-wider font-bold">Estoque Baixo</p>
+                                                    <p className="text-2xl font-bold text-white">{dashboardMetrics.lowStockProducts} <span className="text-xs font-normal text-gray-400">prods.</span></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-8 bg-ios-card/50 border border-white/5 rounded-2xl p-6">
+                                        <h4 className="text-lg font-bold text-white mb-4">Produtos com Estoque Crítico</h4>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left text-sm text-gray-400">
+                                                <thead className="bg-white/5 text-gray-200 uppercase text-xs font-bold">
+                                                    <tr>
+                                                        <th className="p-3 rounded-tl-lg">Produto</th>
+                                                        <th className="p-3">Cor</th>
+                                                        <th className="p-3">Tamanho</th>
+                                                        <th className="p-3 rounded-tr-lg">Quantidade</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {products.flatMap(p => 
+                                                        (p.stock || []).filter(s => s.quantity < 5).map((s, idx) => (
+                                                            <tr key={`${p.id}-${s.color}-${s.size}`} className="border-b border-white/5 hover:bg-white/5">
+                                                                <td className="p-3 font-medium text-white">{p.name}</td>
+                                                                <td className="p-3">{s.color}</td>
+                                                                <td className="p-3">{s.size}</td>
+                                                                <td className="p-3 font-bold text-red-400">{s.quantity}</td>
+                                                            </tr>
+                                                        ))
+                                                    ).slice(0, 10)}
+                                                    {dashboardMetrics.lowStockProducts === 0 && (
+                                                        <tr>
+                                                            <td colSpan={4} className="p-6 text-center text-gray-500">Nenhum produto com estoque crítico.</td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {adminTab === 'products' && (
                                 <div className="space-y-6">
                                     <div className="flex justify-between items-center">
@@ -820,6 +1055,9 @@ export default function App() {
                                                     <div>
                                                         <h4 className={`font-bold text-white ${!p.visible ? 'opacity-50' : ''}`}>{p.name}</h4>
                                                         <p className="text-xs text-gray-400">R$ {p.price.toFixed(2)} • {p.category}</p>
+                                                        <p className="text-[10px] text-gray-500 mt-1">
+                                                            Estoque Total: {p.stock?.reduce((a,b) => a + b.quantity, 0) || 0}
+                                                        </p>
                                                     </div>
                                                 </div>
                                                 <div className="flex gap-2">
@@ -1062,10 +1300,56 @@ export default function App() {
                                 <input type="number" step="0.01" placeholder="Preço Promocional" className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white" value={editingProduct.promoPrice || ''} onChange={e => setEditingProduct({...editingProduct, promoPrice: parseFloat(e.target.value)})} />
                             )}
                          </div>
+                         
                          <div className="bg-white/5 p-4 rounded-xl border border-white/10">
-                            <label className="block text-sm font-bold text-white mb-3">Cores Disponíveis</label>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {ALL_COLORS.map(c => {
+                            <div className="flex justify-between items-center mb-3">
+                                <label className="text-sm font-bold text-white">Cores & Estoque</label>
+                                <button 
+                                    onClick={() => setIsColorPickerOpen(!isColorPickerOpen)} 
+                                    className="text-xs flex items-center gap-1 text-ios-blue hover:text-white transition-colors font-medium bg-ios-blue/10 px-2 py-1 rounded-full border border-ios-blue/20"
+                                >
+                                    {isColorPickerOpen ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                                    Nova Cor
+                                </button>
+                            </div>
+                            
+                            {/* Color Picker Logic (Same as before) */}
+                            {isColorPickerOpen && (
+                                <div className="mb-4 bg-black/30 p-3 rounded-xl border border-white/10 animate-fade-in">
+                                    <div className="flex items-end gap-3">
+                                        <div>
+                                            <label className="block text-[10px] text-gray-400 mb-1">Cor</label>
+                                            <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-white/20 hover:border-white transition-colors">
+                                                <input 
+                                                    type="color" 
+                                                    className="absolute inset-[-50%] w-[200%] h-[200%] p-0 cursor-pointer border-none outline-none" 
+                                                    value={newColorData.hex}
+                                                    onChange={(e) => setNewColorData({...newColorData, hex: e.target.value})}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="block text-[10px] text-gray-400 mb-1">Nome da Cor</label>
+                                            <input 
+                                                className="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-ios-blue outline-none"
+                                                placeholder="Ex: Verde Neon"
+                                                value={newColorData.name}
+                                                onChange={(e) => setNewColorData({...newColorData, name: e.target.value})}
+                                            />
+                                        </div>
+                                        <button 
+                                            onClick={handleSaveNewColor}
+                                            className="bg-ios-blue hover:bg-blue-600 text-white p-2.5 rounded-lg transition-colors"
+                                        >
+                                            <Save className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Color Selection Buttons */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[150px] overflow-y-auto custom-scrollbar mb-4">
+                                {availableColors.map(c => {
                                     const isSelected = editingProduct.colors?.includes(c.name);
                                     return (
                                         <button 
@@ -1078,12 +1362,58 @@ export default function App() {
                                             }}
                                             className={`border rounded-lg p-2 flex items-center gap-2 transition-colors ${isSelected ? 'border-ios-blue bg-ios-blue/10' : 'border-white/10 hover:bg-white/5'}`}
                                         >
-                                            <div className="w-4 h-4 rounded-full border border-gray-600" style={{backgroundColor: c.hex}}></div>
-                                            <span className="text-xs text-gray-300">{c.name}</span>
+                                            <div className="w-4 h-4 rounded-full border border-gray-600 shadow-sm" style={{backgroundColor: c.hex}}></div>
+                                            <span className="text-xs text-gray-300 truncate w-full text-left">{c.name}</span>
                                         </button>
                                     );
                                 })}
                             </div>
+
+                            {/* Stock Quantity Inputs */}
+                            {(editingProduct.colors || []).length > 0 && (
+                                <div className="mt-4 border-t border-white/10 pt-4">
+                                    <label className="block text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">Quantidades em Estoque</label>
+                                    <div className="space-y-4">
+                                        {editingProduct.colors?.map(color => (
+                                            <div key={color} className="bg-black/20 p-3 rounded-lg border border-white/5">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <div className="w-3 h-3 rounded-full" style={{backgroundColor: availableColors.find(ac => ac.name === color)?.hex || '#333'}}></div>
+                                                    <span className="text-sm font-bold text-white">{color}</span>
+                                                </div>
+                                                <div className="grid grid-cols-4 gap-2">
+                                                    {(editingProduct.sizes || ['P', 'M', 'G']).map(size => {
+                                                        const stockItem = editingProduct.stock?.find(s => s.color === color && s.size === size);
+                                                        const qty = stockItem ? stockItem.quantity : 0;
+                                                        return (
+                                                            <div key={size} className="flex flex-col gap-1">
+                                                                <span className="text-[10px] text-gray-500 text-center">{size}</span>
+                                                                <input 
+                                                                    type="number" 
+                                                                    min="0"
+                                                                    className="bg-white/5 border border-white/10 rounded px-1 py-1 text-center text-white text-sm focus:border-ios-blue outline-none"
+                                                                    value={qty}
+                                                                    onChange={(e) => {
+                                                                        const newQty = parseInt(e.target.value) || 0;
+                                                                        const newStock = [...(editingProduct.stock || [])];
+                                                                        const existingIdx = newStock.findIndex(s => s.color === color && s.size === size);
+                                                                        
+                                                                        if (existingIdx >= 0) {
+                                                                            newStock[existingIdx] = { ...newStock[existingIdx], quantity: newQty };
+                                                                        } else {
+                                                                            newStock.push({ color, size, quantity: newQty });
+                                                                        }
+                                                                        setEditingProduct({ ...editingProduct, stock: newStock });
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                          </div>
                          <button disabled={isUploading} onClick={handleSaveProduct} className="w-full bg-ios-blue text-white font-bold py-4 rounded-xl mt-4 disabled:opacity-50">Salvar Produto</button>
                     </div>
