@@ -892,7 +892,7 @@ export default function App() {
       {/* Hero */}
       <section className="pt-24 pb-16 px-6 text-center max-w-[980px] mx-auto relative z-10">
         <div className="animate-fade-in">
-          <p key={settings.collectionTitle} className="text-ios-purple font-bold text-xl md:text-2xl mb-4 tracking-widest uppercase animate-explosion">{settings.collectionTitle}</p>
+          <p key={settings.collectionTitle} className="text-ios-purple font-bold text-lg md:text-xl mb-4 tracking-widest uppercase animate-explosion">{settings.collectionTitle}</p>
           
           <div className="flex justify-center mb-8">
             <div className="relative animate-unfold origin-top">
