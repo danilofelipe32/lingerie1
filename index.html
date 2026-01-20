@@ -37,6 +37,8 @@
                         'subtle-zoom': 'subtleZoom 15s ease-in-out infinite alternate',
                         'explosion': 'explosion 2s ease-in-out infinite',
                         'blob': 'blob 10s infinite',
+                        'unfold': 'unfold 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'shine': 'shine 1.5s ease-out forwards 0.5s',
                     },
                     keyframes: {
                         fadeIn: {
@@ -64,6 +66,15 @@
                             '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
                             '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
                             '100%': { transform: 'translate(0px, 0px) scale(1)' }
+                        },
+                        unfold: {
+                            '0%': { opacity: '0', transform: 'perspective(1000px) rotateX(90deg) scale(0.8)' },
+                            '100%': { opacity: '1', transform: 'perspective(1000px) rotateX(0deg) scale(1)' }
+                        },
+                        shine: {
+                            '0%': { left: '-100%', opacity: '0' },
+                            '20%': { opacity: '0.6' },
+                            '100%': { left: '200%', opacity: '0' }
                         }
                     }
                 }

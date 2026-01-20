@@ -865,11 +865,15 @@ export default function App() {
           <p key={settings.collectionTitle} className="text-ios-purple font-bold text-xl md:text-2xl mb-4 tracking-widest uppercase animate-explosion">{settings.collectionTitle}</p>
           
           <div className="flex justify-center mb-8">
-            <img 
-                src="https://i.imgur.com/9dewYxZ.png" 
-                alt="Elegância Redefinida" 
-                className="w-full max-w-[600px] object-contain drop-shadow-2xl animate-scale-in" 
-            />
+            <div className="relative animate-unfold origin-top">
+                <img 
+                    src="https://i.imgur.com/9dewYxZ.png" 
+                    alt="Elegância Redefinida" 
+                    className="w-full max-w-[600px] object-contain drop-shadow-2xl" 
+                />
+                {/* Shine overlay */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent w-1/2 h-full -skew-x-12 animate-shine pointer-events-none blur-md mix-blend-overlay"></div>
+            </div>
           </div>
 
           <p className="text-xl md:text-2xl text-gray-300 font-normal max-w-xl mx-auto mb-10 leading-relaxed drop-shadow-md">
