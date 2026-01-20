@@ -12,7 +12,7 @@ import {
   CheckoutData,
   StockVariant
 } from './types';
-import { ShoppingBag, X, Check, Lock, Grid, Tag, Settings, Plus, Trash2, Edit2, Search, Loader, Upload, Palette, Save, TrendingUp, AlertTriangle, Package, DollarSign, BarChart3 } from 'lucide-react';
+import { ShoppingBag, X, Check, Lock, Grid, Tag, Settings, Plus, Trash2, Edit2, Search, Loader, Upload, Palette, Save, TrendingUp, AlertTriangle, Package, DollarSign, BarChart3, Eye, EyeOff } from 'lucide-react';
 import { supabase } from './supabase';
 
 // --- Helper Functions for DB Mapping ---
@@ -450,6 +450,14 @@ export default function App() {
         setProducts(prev => prev.filter(p => p.id !== id)); // Optimistic
         await supabase.from('products').delete().eq('id', id);
     }
+  }
+
+  const toggleProductVisibility = async (product: Product) => {
+      const newStatus = !product.visible;
+      // Optimistic
+      setProducts(prev => prev.map(p => p.id === product.id ? { ...p, visible: newStatus } : p));
+      // DB
+      await supabase.from('products').update({ visible: newStatus }).eq('id', product.id);
   }
 
   const handleSaveSettings = async () => {
@@ -1060,9 +1068,21 @@ export default function App() {
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <div className="flex gap-2">
-                                                    <button onClick={() => setEditingProduct(p)} className="p-2 text-ios-blue hover:bg-white/5 rounded-lg"><Edit2 className="w-4 h-4" /></button>
-                                                    <button onClick={() => deleteProduct(p.id)} className="p-2 text-ios-red hover:bg-white/5 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex flex-col items-center mr-4">
+                                                        <span className="text-[10px] text-gray-500 mb-1">{p.visible ? 'Visível' : 'Oculto'}</span>
+                                                        <button 
+                                                            onClick={() => toggleProductVisibility(p)}
+                                                            className={`w-10 h-6 rounded-full p-1 transition-colors duration-300 relative ${p.visible ? 'bg-ios-green' : 'bg-white/10'}`}
+                                                            title={p.visible ? "Ocultar do catálogo" : "Mostrar no catálogo"}
+                                                        >
+                                                            <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${p.visible ? 'translate-x-4' : 'translate-x-0'}`} />
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => setEditingProduct(p)} className="p-2 text-ios-blue hover:bg-white/5 rounded-lg"><Edit2 className="w-4 h-4" /></button>
+                                                        <button onClick={() => deleteProduct(p.id)} className="p-2 text-ios-red hover:bg-white/5 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
