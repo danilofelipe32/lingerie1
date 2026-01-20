@@ -657,7 +657,7 @@ export default function App() {
                         <div 
                             key={c}
                             className="w-2.5 h-2.5 rounded-full border border-white/10 shadow-[0_0_2px_rgba(0,0,0,0.5)]"
-                            style={{ backgroundColor: availableColors.find(ac => ac.name === c)?.hex || '#333' }}
+                            style={{ backgroundColor: availableColors.find(ac => ac.name.toLowerCase() === c.toLowerCase())?.hex || '#333' }}
                             title={c}
                         />
                     ))}
@@ -747,7 +747,7 @@ export default function App() {
                                             key={c}
                                             onClick={() => setColor(c)}
                                             className={`w-10 h-10 rounded-full border-2 transition-all ${color === c ? 'border-ios-blue scale-110' : 'border-transparent hover:border-gray-600'}`}
-                                            style={{ backgroundColor: availableColors.find(ac => ac.name === c)?.hex || '#333' }}
+                                            style={{ backgroundColor: availableColors.find(ac => ac.name.toLowerCase() === c.toLowerCase())?.hex || '#333' }}
                                         />
                                     ))}
                                 </div>
@@ -1391,7 +1391,7 @@ export default function App() {
                                                                             <span className="text-white font-medium">{item.quantity}x</span>
                                                                             <span className="text-gray-300">{item.name}</span>
                                                                             <span className="text-gray-500 bg-white/5 px-1.5 rounded text-[10px]">{item.selectedSize}</span>
-                                                                            <div className="w-2 h-2 rounded-full mt-0.5 border border-white/10" style={{ backgroundColor: availableColors.find(ac => ac.name === item.selectedColor)?.hex || '#333' }} title={item.selectedColor}></div>
+                                                                            <div className="w-2 h-2 rounded-full mt-0.5 border border-white/10" style={{ backgroundColor: availableColors.find(ac => ac.name.toLowerCase() === item.selectedColor?.toLowerCase())?.hex || '#333' }} title={item.selectedColor}></div>
                                                                         </div>
                                                                     )) : <span className="text-xs text-red-400">Erro ao ler itens</span>}
                                                                 </div>
@@ -1791,7 +1791,7 @@ export default function App() {
                                         {editingProduct.colors?.map(color => (
                                             <div key={color} className="bg-black/20 p-3 rounded-lg border border-white/5">
                                                 <div className="flex items-center gap-2 mb-2">
-                                                    <div className="w-3 h-3 rounded-full" style={{backgroundColor: availableColors.find(ac => ac.name === color)?.hex || '#333'}}></div>
+                                                    <div className="w-3 h-3 rounded-full" style={{backgroundColor: availableColors.find(ac => ac.name.toLowerCase() === color.toLowerCase())?.hex || '#333'}}></div>
                                                     <span className="text-sm font-bold text-white">{color}</span>
                                                 </div>
                                                 <div className="grid grid-cols-4 gap-2">

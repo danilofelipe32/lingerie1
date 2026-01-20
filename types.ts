@@ -59,18 +59,23 @@ export interface Sale {
 }
 
 export const ALL_COLORS = [
-  { name: "Preto", hex: "#111111" },
+  { name: "Preto", hex: "#000000" },
   { name: "Branco", hex: "#FFFFFF" },
-  { name: "Vermelho", hex: "#DC2626" },
-  { name: "Vinho", hex: "#4a0404" },
-  { name: "Azul", hex: "#191970" },
-  { name: "Nude", hex: "#d4a574" },
-  { name: "Bordeaux", hex: "#800020" },
-  { name: "Cacau", hex: "#3e2723" },
-  { name: "Pérola", hex: "#eae0c8" },
-  { name: "Rubi", hex: "#9b111e" },
-  { name: "Violeta", hex: "#2e003e" },
-  { name: "Rosa", hex: "#ffc0cb" }
+  { name: "Vermelho", hex: "#C21807" },   // Vermelho Sangue
+  { name: "Vinho", hex: "#560319" },      // Vinho Escuro
+  { name: "Azul", hex: "#0F172A" },       // Azul Meia Noite
+  { name: "Nude", hex: "#EBC8B2" },       // Nude Clássico
+  { name: "Bordeaux", hex: "#4C0519" },   // Bordeaux Intenso
+  { name: "Cacau", hex: "#3F2318" },      // Marrom Café
+  { name: "Pérola", hex: "#F4E9D7" },     // Off-white Creme
+  { name: "Rubi", hex: "#900603" },       // Vermelho Rubi
+  { name: "Violeta", hex: "#4C1D95" },    // Violeta Profundo
+  { name: "Rosa", hex: "#F472B6" },       // Rosa Romântico
+  { name: "Rosa Chá", hex: "#d18e97" },
+  { name: "Lavanda", hex: "#A78BFA" },
+  { name: "Verde Esmeralda", hex: "#065f46" },
+  { name: "Coral", hex: "#fb7185" },
+  { name: "Marsala", hex: "#702F3B" }
 ];
 
 export const INITIAL_PRODUCTS: Product[] = [
