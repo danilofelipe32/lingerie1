@@ -592,9 +592,26 @@ export default function App() {
 
   const handleSaveSettings = async () => {
      // Assuming single row with ID 1 or UPSERT strategy
-     // First try to update
+     // Update
      const { error } = await supabase.from('site_settings').upsert({ id: 1, collection_title: settings.collectionTitle });
-     if (error) console.error(error);
+     if (error) {
+        console.error(error);
+        alert('Erro ao salvar configurações.');
+     } else {
+        // Visual feedback
+        const btn = document.getElementById('btn-save-settings');
+        if (btn) {
+            const original = btn.innerText;
+            btn.innerText = 'Salvo com Sucesso!';
+            btn.classList.add('bg-green-600', 'text-white');
+            btn.classList.remove('bg-ios-blue');
+            setTimeout(() => {
+                btn.innerText = original;
+                btn.classList.remove('bg-green-600', 'text-white');
+                btn.classList.add('bg-ios-blue');
+            }, 2000);
+        }
+     }
   }
   
   // -- Sub-Components (Inline) --
@@ -1488,9 +1505,15 @@ export default function App() {
                                             className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-ios-blue outline-none" 
                                             value={settings.collectionTitle}
                                             onChange={(e) => setSettings({...settings, collectionTitle: e.target.value})}
-                                            onBlur={handleSaveSettings}
                                         />
-                                        <p className="text-xs text-gray-500 mt-2">Alterações são salvas automaticamente ao sair do campo.</p>
+                                        <button 
+                                            id="btn-save-settings"
+                                            onClick={handleSaveSettings}
+                                            className="mt-4 bg-ios-blue text-white font-bold py-3 px-6 rounded-xl hover:bg-blue-600 transition-all active:scale-95 flex items-center gap-2"
+                                        >
+                                            <Save className="w-4 h-4" />
+                                            Salvar Alterações
+                                        </button>
                                     </div>
                                 </div>
                             )}
