@@ -285,6 +285,10 @@ export default function App() {
   const handleSaveProduct = async () => {
     if (!editingProduct || !editingProduct.name) return;
 
+    // Fix: Ensure a category is selected. Fallback to the first available category if the user didn't touch the dropdown.
+    const defaultCategory = categories.find(c => c.id !== 'all')?.id;
+    const finalCategory = editingProduct.category || defaultCategory || 'geral';
+
     // Optimistic Update
     const tempId = editingProduct.id || Date.now();
     const newProductState = {
@@ -292,6 +296,7 @@ export default function App() {
         id: tempId,
         price: Number(editingProduct.price) || 0,
         promoPrice: Number(editingProduct.promoPrice) || 0,
+        category: finalCategory,
         colors: editingProduct.colors || [],
         sizes: editingProduct.sizes || ['P', 'M', 'G'],
         visible: editingProduct.visible !== undefined ? editingProduct.visible : true,
