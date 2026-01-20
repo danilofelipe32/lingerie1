@@ -171,13 +171,24 @@ export default function App() {
         setCoupons(INITIAL_COUPONS);
       }
 
-      // Fetch Settings - Robust fetch using limit instead of single to prevent crash on empty/duplicate
-      const { data: setData, error: settingsError } = await supabase.from('site_settings').select('*').limit(1);
+      // Fetch Settings - FIXED: Explicitly look for ID 1 to match the upsert logic
+      const { data: setData, error: settingsError } = await supabase
+        .from('site_settings')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle(); // Use maybeSingle to handle empty table gracefully
       
       if (settingsError) {
           console.error("Error fetching settings:", settingsError);
-      } else if (setData && setData.length > 0) {
-          setSettings({ collectionTitle: setData[0].collection_title || "Nova Coleção" });
+      } else if (setData) {
+          setSettings({ collectionTitle: setData.collection_title || "Nova Coleção" });
+      } else {
+          // Self-healing: If ID 1 doesn't exist, create it immediately
+          console.log("Initializing Settings DB...");
+          const { error: insertError } = await supabase.from('site_settings').insert({ id: 1, collection_title: "Nova Coleção" });
+          if (!insertError) {
+             setSettings({ collectionTitle: "Nova Coleção" });
+          }
       }
 
       // Fetch Sales (if admin is logged in, or purely on background)
