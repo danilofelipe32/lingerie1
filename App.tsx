@@ -863,11 +863,17 @@ export default function App() {
       <section className="pt-24 pb-16 px-6 text-center max-w-[980px] mx-auto relative z-10">
         <div className="animate-fade-in">
           <p key={settings.collectionTitle} className="text-ios-purple font-bold text-xl md:text-2xl mb-4 tracking-widest uppercase animate-explosion">{settings.collectionTitle}</p>
-          <h2 className="text-5xl md:text-7xl font-bold tracking-tight text-white mb-6 leading-tight drop-shadow-2xl">
-            Elegância.<br />Redefinida.
-          </h2>
+          
+          <div className="flex justify-center mb-8">
+            <img 
+                src="https://i.imgur.com/9dewYxZ.png" 
+                alt="Elegância Redefinida" 
+                className="w-full max-w-[600px] object-contain drop-shadow-2xl animate-scale-in" 
+            />
+          </div>
+
           <p className="text-xl md:text-2xl text-gray-300 font-normal max-w-xl mx-auto mb-10 leading-relaxed drop-shadow-md">
-            Conforto absoluto e design sofisticado para todos os seus momentos.
+            Desejo em silêncio
           </p>
           <button onClick={() => document.getElementById('products-section')?.scrollIntoView({ behavior: 'smooth' })} className="bg-white text-black px-10 py-4 rounded-full font-bold hover:bg-gray-100 transition-colors active:scale-95 text-2xl shadow-[0_0_20px_rgba(255,255,255,0.4)]">
             Ver Coleção
