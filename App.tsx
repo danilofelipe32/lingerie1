@@ -10,9 +10,10 @@ import {
   INITIAL_COUPONS, 
   ALL_COLORS,
   CheckoutData,
-  StockVariant
+  StockVariant,
+  Sale
 } from './types';
-import { ShoppingBag, X, Check, Lock, Grid, Tag, Settings, Plus, Trash2, Edit2, Search, Loader, Upload, Palette, Save, TrendingUp, AlertTriangle, Package, DollarSign, BarChart3, Eye, EyeOff } from 'lucide-react';
+import { ShoppingBag, X, Check, Lock, Grid, Tag, Settings, Plus, Trash2, Edit2, Search, Loader, Upload, Palette, Save, TrendingUp, AlertTriangle, Package, DollarSign, BarChart3, Eye, EyeOff, Calendar, User, CreditCard, Filter, RefreshCw } from 'lucide-react';
 import { supabase } from './supabase';
 
 // --- Helper Functions for DB Mapping ---
@@ -97,9 +98,15 @@ export default function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'products' | 'categories' | 'coupons' | 'settings'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'sales' | 'products' | 'categories' | 'coupons' | 'settings'>('dashboard');
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Sales State & Filters
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [salesFilterStart, setSalesFilterStart] = useState('');
+  const [salesFilterEnd, setSalesFilterEnd] = useState('');
+  const [salesFilterSearch, setSalesFilterSearch] = useState('');
 
   // Checkout State
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -169,6 +176,12 @@ export default function App() {
         setSettings({ collectionTitle: setData.collection_title || "Nova Coleção" });
       }
 
+      // Fetch Sales (if admin is logged in, or purely on background)
+      const { data: salesData } = await supabase.from('sales').select('*').order('created_at', { ascending: false });
+      if (salesData) {
+        setSales(salesData);
+      }
+
     } catch (error) {
       console.error("Error fetching data:", error);
       // Fallback to initial constants if everything fails
@@ -212,7 +225,7 @@ export default function App() {
     }, 0);
   }, [cart]);
 
-  // Dashboard Metrics
+  // Dashboard Metrics (Global)
   const dashboardMetrics = useMemo(() => {
       const totalProducts = products.length;
       const totalStock = products.reduce((acc, p) => acc + (p.stock?.reduce((sAcc, s) => sAcc + s.quantity, 0) || 0), 0);
@@ -224,6 +237,70 @@ export default function App() {
       return { totalProducts, totalStock, totalValue, lowStockProducts };
   }, [products]);
 
+  // -- Sales Logic with Filters --
+  
+  const filteredSales = useMemo(() => {
+      return sales.filter(sale => {
+          // 1. Date Filter
+          const saleDate = new Date(sale.created_at);
+          // Zero out time for accurate day comparison
+          saleDate.setHours(0,0,0,0);
+
+          let dateMatch = true;
+          if (salesFilterStart) {
+              const startDate = new Date(salesFilterStart);
+              startDate.setHours(0,0,0,0);
+              // Adding timezone offset handling if necessary, but simple comparison usually works for YYYY-MM-DD
+              // Ideally explicitly handle UTC vs Local, but standard Date works for same browser session
+              const startDateValue = new Date(startDate.valueOf() + startDate.getTimezoneOffset() * 60000); 
+              if (saleDate < startDateValue) dateMatch = false;
+          }
+          if (salesFilterEnd && dateMatch) {
+               const endDate = new Date(salesFilterEnd);
+               endDate.setHours(0,0,0,0);
+               const endDateValue = new Date(endDate.valueOf() + endDate.getTimezoneOffset() * 60000);
+               if (saleDate > endDateValue) dateMatch = false;
+          }
+
+          // 2. Search Filter (Product Name or Customer Name)
+          let searchMatch = true;
+          if (salesFilterSearch) {
+              const term = salesFilterSearch.toLowerCase();
+              const customerMatch = sale.customer_name.toLowerCase().includes(term);
+              const itemsMatch = sale.items.some(i => i.name.toLowerCase().includes(term));
+              searchMatch = customerMatch || itemsMatch;
+          }
+
+          return dateMatch && searchMatch;
+      });
+  }, [sales, salesFilterStart, salesFilterEnd, salesFilterSearch]);
+
+  // Sales Insights (Dynamic based on filteredSales)
+  const salesInsights = useMemo(() => {
+      const totalRevenue = filteredSales.reduce((acc, s) => acc + s.total, 0);
+      const totalOrders = filteredSales.length;
+      const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      
+      // Calculate best selling product within the filtered range
+      const productSales: {[key: string]: number} = {};
+      filteredSales.forEach(sale => {
+          if (Array.isArray(sale.items)) {
+              sale.items.forEach(item => {
+                  productSales[item.name] = (productSales[item.name] || 0) + item.quantity;
+              });
+          }
+      });
+      
+      const bestSelling = Object.entries(productSales).sort((a, b) => b[1] - a[1])[0];
+      
+      return {
+          totalRevenue,
+          totalOrders,
+          averageTicket,
+          bestSellingProduct: bestSelling ? bestSelling[0] : 'N/A',
+          bestSellingCount: bestSelling ? bestSelling[1] : 0
+      };
+  }, [filteredSales]);
 
   // -- Handlers --
 
@@ -267,7 +344,32 @@ export default function App() {
     if (checkoutStep < 2) {
       setCheckoutStep(prev => prev + 1);
     } else {
-      // 1. Send to WhatsApp
+      // 0. Prepare Sale Data
+      const saleData = {
+          customer_name: checkoutData.name,
+          customer_address: checkoutData.address,
+          payment_method: checkoutData.payment,
+          total: cartTotal,
+          items: cart, // Supabase handles JSONB automatically
+          created_at: new Date().toISOString()
+      };
+
+      // 1. Record Sale in Supabase
+      try {
+          const { error } = await supabase.from('sales').insert(saleData);
+          if (error) {
+              console.error("Error saving sale:", error);
+              // We proceed anyway to ensure the user can buy on WhatsApp, but admin data might miss this
+          } else {
+              // Refresh sales list locally if success
+              const { data: latestSales } = await supabase.from('sales').select('*').order('created_at', { ascending: false });
+              if (latestSales) setSales(latestSales);
+          }
+      } catch (err) {
+          console.error("Unexpected error saving sale:", err);
+      }
+
+      // 2. Send to WhatsApp
       const whatsappNumber = "5584933004076";
       let msg = `*Pedido NQ Secrets*\n\n👤 *Cliente:* ${checkoutData.name}\n📍 *Endereço:* ${checkoutData.address}\n💳 *Pagamento:* ${checkoutData.payment}\n\n🛒 *ITENS:*`;
       cart.forEach(i => msg += `\n- ${i.quantity}x ${i.name} (${i.selectedSize}, ${i.selectedColor})`);
@@ -279,7 +381,7 @@ export default function App() {
       
       window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
 
-      // 2. Update Stock in Supabase
+      // 3. Update Stock in Supabase
       try {
           for (const item of cart) {
               const product = products.find(p => p.id === item.id);
@@ -343,12 +445,37 @@ export default function App() {
         });
     }
   };
+  
+  // -- Helper for Dates --
+  const setFilterToday = () => {
+      const today = new Date().toISOString().split('T')[0];
+      setSalesFilterStart(today);
+      setSalesFilterEnd(today);
+  }
+
+  const setFilterMonth = () => {
+      const date = new Date();
+      const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+      const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+      setSalesFilterStart(firstDay);
+      setSalesFilterEnd(lastDay);
+  }
+
+  const clearFilters = () => {
+      setSalesFilterStart('');
+      setSalesFilterEnd('');
+      setSalesFilterSearch('');
+  }
 
   // -- Admin Handlers --
 
   const handleAdminLogin = () => {
     if (adminPassword === "NEILAQUEIROZ") {
       setIsAdminLoggedIn(true);
+      // Fetch fresh sales data on login
+      supabase.from('sales').select('*').order('created_at', { ascending: false }).then(({data}) => {
+          if (data) setSales(data);
+      });
     } else {
       alert("Senha incorreta");
     }
@@ -997,6 +1124,7 @@ export default function App() {
                         <aside className="bg-ios-card/50 border-r border-white/5 p-4 flex md:flex-col gap-2 overflow-x-auto">
                             {[
                                 { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+                                { id: 'sales', label: 'Vendas', icon: ShoppingBag },
                                 { id: 'products', label: 'Produtos', icon: Grid },
                                 { id: 'categories', label: 'Categorias', icon: Tag },
                                 { id: 'coupons', label: 'Cupons', icon: Tag },
@@ -1094,6 +1222,177 @@ export default function App() {
                                                     {dashboardMetrics.lowStockProducts === 0 && (
                                                         <tr>
                                                             <td colSpan={4} className="p-6 text-center text-gray-500">Nenhum produto com estoque crítico.</td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {adminTab === 'sales' && (
+                                <div className="space-y-6 animate-fade-in">
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                        <h3 className="text-2xl font-bold text-white">Vendas & Insights</h3>
+                                    </div>
+                                    
+                                    {/* Filters Bar */}
+                                    <div className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col lg:flex-row gap-4">
+                                        <div className="flex flex-1 gap-2 items-center">
+                                            <div className="relative flex-1 max-w-xs">
+                                                <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Buscar Cliente ou Produto..." 
+                                                    className="w-full bg-black/40 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm text-white focus:border-ios-blue outline-none placeholder-gray-600"
+                                                    value={salesFilterSearch}
+                                                    onChange={(e) => setSalesFilterSearch(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="h-6 w-px bg-white/10 mx-2 hidden lg:block"></div>
+                                        </div>
+                                        
+                                        <div className="flex flex-col sm:flex-row gap-3 items-center">
+                                            <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-lg px-2 py-1">
+                                                <span className="text-xs text-gray-500 pl-1">De:</span>
+                                                <input 
+                                                    type="date" 
+                                                    className="bg-transparent text-white text-sm p-1 outline-none [&::-webkit-calendar-picker-indicator]:invert"
+                                                    value={salesFilterStart}
+                                                    onChange={(e) => setSalesFilterStart(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-lg px-2 py-1">
+                                                <span className="text-xs text-gray-500 pl-1">Até:</span>
+                                                <input 
+                                                    type="date" 
+                                                    className="bg-transparent text-white text-sm p-1 outline-none [&::-webkit-calendar-picker-indicator]:invert"
+                                                    value={salesFilterEnd}
+                                                    onChange={(e) => setSalesFilterEnd(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                            <button onClick={setFilterToday} className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-medium text-gray-300 transition-colors">Hoje</button>
+                                            <button onClick={setFilterMonth} className="px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-medium text-gray-300 transition-colors">Este Mês</button>
+                                            {(salesFilterStart || salesFilterEnd || salesFilterSearch) && (
+                                                <button onClick={clearFilters} className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-medium transition-colors flex items-center gap-1">
+                                                    <X className="w-3 h-3" /> Limpar
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Insights Cards */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="bg-white/5 p-6 rounded-2xl border border-white/10 flex flex-col justify-between h-32">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">Faturamento (Filtrado)</p>
+                                                    <h4 className="text-2xl font-bold text-white mt-1">R$ {salesInsights.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
+                                                </div>
+                                                <div className="bg-ios-green/20 p-2 rounded-lg">
+                                                    <DollarSign className="w-5 h-5 text-ios-green" />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white/5 p-6 rounded-2xl border border-white/10 flex flex-col justify-between h-32">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">Pedidos</p>
+                                                    <h4 className="text-2xl font-bold text-white mt-1">{salesInsights.totalOrders}</h4>
+                                                </div>
+                                                <div className="bg-ios-blue/20 p-2 rounded-lg">
+                                                    <ShoppingBag className="w-5 h-5 text-ios-blue" />
+                                                </div>
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-2">
+                                                Ticket Médio: R$ {salesInsights.averageTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white/5 p-6 rounded-2xl border border-white/10 flex flex-col justify-between h-32">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wide">Mais Vendido</p>
+                                                    <h4 className="text-lg font-bold text-white mt-1 line-clamp-1" title={salesInsights.bestSellingProduct}>{salesInsights.bestSellingProduct}</h4>
+                                                </div>
+                                                <div className="bg-ios-purple/20 p-2 rounded-lg">
+                                                    <TrendingUp className="w-5 h-5 text-ios-purple" />
+                                                </div>
+                                            </div>
+                                            <div className="text-xs text-gray-500 mt-2">
+                                                {salesInsights.bestSellingCount} unidades neste período
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Sales Table */}
+                                    <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden mt-8">
+                                        <div className="p-6 border-b border-white/5 flex justify-between items-center">
+                                            <h4 className="font-bold text-white">
+                                                Histórico de Pedidos 
+                                                <span className="text-gray-500 font-normal text-sm ml-2">({filteredSales.length} registros)</span>
+                                            </h4>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left text-sm text-gray-400">
+                                                <thead className="bg-black/20 text-gray-200 uppercase text-xs font-bold">
+                                                    <tr>
+                                                        <th className="p-4">Data</th>
+                                                        <th className="p-4">Cliente</th>
+                                                        <th className="p-4">Resumo do Pedido</th>
+                                                        <th className="p-4">Pagamento</th>
+                                                        <th className="p-4 text-right">Total</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {filteredSales.length > 0 ? filteredSales.map((sale) => (
+                                                        <tr key={sale.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                                            <td className="p-4 whitespace-nowrap">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Calendar className="w-3 h-3 text-gray-500" />
+                                                                    {new Date(sale.created_at).toLocaleDateString('pt-BR')}
+                                                                    <span className="text-xs text-gray-600">{new Date(sale.created_at).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <div className="flex items-center gap-2">
+                                                                    <User className="w-3 h-3 text-gray-500" />
+                                                                    <span className="text-white font-medium">{sale.customer_name}</span>
+                                                                </div>
+                                                                <div className="text-xs text-gray-500 mt-1 truncate max-w-[200px]">{sale.customer_address}</div>
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <div className="space-y-1">
+                                                                    {Array.isArray(sale.items) ? sale.items.map((item, idx) => (
+                                                                        <div key={idx} className="flex gap-2 text-xs">
+                                                                            <span className="text-white font-medium">{item.quantity}x</span>
+                                                                            <span className="text-gray-300">{item.name}</span>
+                                                                            <span className="text-gray-500 bg-white/5 px-1.5 rounded text-[10px]">{item.selectedSize}</span>
+                                                                            <div className="w-2 h-2 rounded-full mt-0.5 border border-white/10" style={{ backgroundColor: availableColors.find(ac => ac.name === item.selectedColor)?.hex || '#333' }} title={item.selectedColor}></div>
+                                                                        </div>
+                                                                    )) : <span className="text-xs text-red-400">Erro ao ler itens</span>}
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <div className="flex items-center gap-2">
+                                                                    <CreditCard className="w-3 h-3 text-gray-500" />
+                                                                    {sale.payment_method}
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-4 text-right font-bold text-white text-base">
+                                                                R$ {sale.total.toFixed(2).replace('.', ',')}
+                                                            </td>
+                                                        </tr>
+                                                    )) : (
+                                                        <tr>
+                                                            <td colSpan={5} className="p-8 text-center text-gray-500">
+                                                                Nenhuma venda encontrada para os filtros selecionados.
+                                                            </td>
                                                         </tr>
                                                     )}
                                                 </tbody>

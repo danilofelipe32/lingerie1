@@ -46,6 +46,17 @@ export interface CheckoutData {
   payment: string;
 }
 
+// Interface para o histórico de vendas
+export interface Sale {
+  id: number;
+  created_at: string;
+  customer_name: string;
+  customer_address: string;
+  payment_method: string;
+  total: number;
+  items: CartItem[]; // Itens salvos como JSON
+}
+
 export const ALL_COLORS = [
   { name: "Preto", hex: "#111111" },
   { name: "Branco", hex: "#FFFFFF" },
