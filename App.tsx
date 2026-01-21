@@ -902,13 +902,19 @@ export default function App() {
           
           <div className="flex justify-center mb-8">
             <div className="relative animate-unfold origin-top">
+                {/* Keyhole Light Effect */}
+                <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 flex flex-col items-center justify-center opacity-50 blur-2xl pointer-events-none">
+                     <div className="w-[180px] h-[180px] md:w-[280px] md:h-[280px] rounded-full bg-white/70 shadow-[0_0_80px_rgba(255,255,255,0.6)]"></div>
+                     <div className="w-[100px] h-[160px] md:w-[160px] md:h-[240px] bg-white/70 -mt-10 md:-mt-16 shadow-[0_0_80px_rgba(255,255,255,0.6)]" style={{ clipPath: 'polygon(15% 0%, 85% 0%, 100% 100%, 0% 100%)' }}></div>
+                </div>
+
                 <img 
                     src="https://i.imgur.com/9dewYxZ.png" 
                     alt="Elegância Redefinida" 
-                    className="w-full max-w-[600px] object-contain drop-shadow-2xl" 
+                    className="w-full max-w-[600px] object-contain drop-shadow-2xl relative z-10" 
                 />
                 {/* Shine overlay */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent w-1/2 h-full -skew-x-12 animate-shine pointer-events-none blur-md mix-blend-overlay"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent w-1/2 h-full -skew-x-12 animate-shine pointer-events-none blur-md mix-blend-overlay z-20"></div>
             </div>
           </div>
 
