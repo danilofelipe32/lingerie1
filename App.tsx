@@ -359,32 +359,8 @@ export default function App() {
     if (checkoutStep < 2) {
       setCheckoutStep(prev => prev + 1);
     } else {
-      // 0. Prepare Sale Data
-      const saleData = {
-          customer_name: checkoutData.name,
-          customer_address: checkoutData.address,
-          payment_method: checkoutData.payment,
-          total: cartTotal,
-          items: cart, // Supabase handles JSONB automatically
-          created_at: new Date().toISOString()
-      };
-
-      // 1. Record Sale in Supabase
-      try {
-          const { error } = await supabase.from('sales').insert(saleData);
-          if (error) {
-              console.error("Error saving sale:", error);
-              // We proceed anyway to ensure the user can buy on WhatsApp, but admin data might miss this
-          } else {
-              // Refresh sales list locally if success
-              const { data: latestSales } = await supabase.from('sales').select('*').order('created_at', { ascending: false });
-              if (latestSales) setSales(latestSales);
-          }
-      } catch (err) {
-          console.error("Unexpected error saving sale:", err);
-      }
-
-      // 2. Send to WhatsApp
+      // 1. Prepare WhatsApp Message & Open IMMEDIATELY to avoid popup blockers
+      // This ensures the user is redirected even if DB operations are slow or fail
       const whatsappNumber = "5584933004076";
       let msg = `*Pedido NQ Secrets*\n\n👤 *Cliente:* ${checkoutData.name}\n📍 *Endereço:* ${checkoutData.address}\n💳 *Pagamento:* ${checkoutData.payment}\n\n🛒 *ITENS:*`;
       cart.forEach(i => msg += `\n- ${i.quantity}x ${i.name} (${i.selectedSize}, ${i.selectedColor})`);
@@ -394,9 +370,34 @@ export default function App() {
       }
       msg += `\n\n💰 *Total:* R$ ${cartTotal.toFixed(2).replace('.', ',')}`;
       
+      // Open WhatsApp
       window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank');
 
-      // 3. Update Stock in Supabase
+      // 2. Prepare Sale Data
+      const saleData = {
+          customer_name: checkoutData.name,
+          customer_address: checkoutData.address,
+          payment_method: checkoutData.payment,
+          total: cartTotal,
+          items: cart, // Supabase handles JSONB automatically
+          created_at: new Date().toISOString()
+      };
+
+      // 3. Record Sale in Supabase
+      try {
+          const { error } = await supabase.from('sales').insert(saleData);
+          if (error) {
+              console.error("Error saving sale:", error);
+          } else {
+              // Refresh sales list locally if success
+              const { data: latestSales } = await supabase.from('sales').select('*').order('created_at', { ascending: false });
+              if (latestSales) setSales(latestSales);
+          }
+      } catch (err) {
+          console.error("Unexpected error saving sale:", err);
+      }
+
+      // 4. Update Stock in Supabase
       try {
           for (const item of cart) {
               const product = products.find(p => p.id === item.id);
