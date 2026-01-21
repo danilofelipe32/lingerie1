@@ -1079,6 +1079,13 @@ export default function App() {
                 >
                     Finalizar no WhatsApp
                 </button>
+
+                <button 
+                    onClick={() => setIsCartOpen(false)}
+                    className="w-full bg-transparent border border-white/10 text-white py-3.5 rounded-xl font-semibold text-sm hover:bg-white/5 transition-colors"
+                >
+                    Continuar Comprando
+                </button>
             </div>
         </div>
       </div>
