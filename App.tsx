@@ -895,7 +895,7 @@ export default function App() {
       <section className="pt-24 pb-16 px-6 text-center max-w-[980px] mx-auto relative z-10">
         <div className="animate-fade-in">
           {settings.collectionTitle && (
-            <div className="-translate-y-[40px]">
+            <div className="-translate-y-[20px]">
                 <p key={settings.collectionTitle} className="text-ios-purple font-bold text-lg md:text-xl mb-4 tracking-widest uppercase animate-explosion">{settings.collectionTitle}</p>
             </div>
           )}
