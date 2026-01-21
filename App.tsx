@@ -114,6 +114,7 @@ export default function App() {
   const [salesFilterStart, setSalesFilterStart] = useState('');
   const [salesFilterEnd, setSalesFilterEnd] = useState('');
   const [salesFilterSearch, setSalesFilterSearch] = useState('');
+  const [viewingSale, setViewingSale] = useState<Sale | null>(null);
 
   // Checkout State
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -894,7 +895,7 @@ export default function App() {
       <section className="pt-24 pb-16 px-6 text-center max-w-[980px] mx-auto relative z-10">
         <div className="animate-fade-in">
           {settings.collectionTitle && (
-            <div className="-translate-y-[60px]">
+            <div className="-translate-y-[40px]">
                 <p key={settings.collectionTitle} className="text-ios-purple font-bold text-lg md:text-xl mb-4 tracking-widest uppercase animate-explosion">{settings.collectionTitle}</p>
             </div>
           )}
@@ -1159,6 +1160,71 @@ export default function App() {
         </div>
       </Modal>
 
+      {/* Sale Detail Modal */}
+      <Modal isOpen={!!viewingSale} onClose={() => setViewingSale(null)} zIndex={75}>
+        {viewingSale && (
+            <div className="bg-ios-card rounded-[2rem] shadow-2xl overflow-hidden text-white w-full max-w-lg">
+                 <div className="p-6 border-b border-white/10 flex justify-between items-center bg-black/20">
+                    <h3 className="text-lg font-bold">Detalhes do Pedido #{viewingSale.id}</h3>
+                    <button onClick={() => setViewingSale(null)}><X className="w-5 h-5 text-gray-400 hover:text-white transition-colors" /></button>
+                 </div>
+                 <div className="p-6 max-h-[70vh] overflow-y-auto">
+                    {/* Customer Info */}
+                    <div className="space-y-4 mb-6">
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase tracking-wide font-bold">Cliente</label>
+                            <p className="font-medium text-lg text-white">{viewingSale.customer_name}</p>
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-500 uppercase tracking-wide font-bold">Endereço</label>
+                            <p className="text-gray-300">{viewingSale.customer_address}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase tracking-wide font-bold">Data</label>
+                                <p className="text-gray-300">{new Date(viewingSale.created_at).toLocaleString('pt-BR')}</p>
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase tracking-wide font-bold">Pagamento</label>
+                                <p className="text-gray-300">{viewingSale.payment_method}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Items List */}
+                    <h4 className="font-bold text-white mb-3 border-t border-white/10 pt-4 text-sm uppercase tracking-wide">Itens do Pedido</h4>
+                    <div className="space-y-3">
+                        {viewingSale.items.map((item, idx) => (
+                            <div key={idx} className="flex gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                                <div className="w-12 h-12 bg-white/10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                                     {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : item.icon}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="flex justify-between">
+                                        <p className="font-medium text-sm text-white">{item.name}</p>
+                                        <p className="font-bold text-sm text-white">R$ {(item.promoPrice || item.price).toFixed(2).replace('.', ',')}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-xs text-gray-400 bg-white/5 px-1.5 py-0.5 rounded">{item.selectedSize}</span>
+                                        <span className="text-xs text-gray-400">{item.selectedColor}</span>
+                                        <div className="w-2 h-2 rounded-full border border-white/10" style={{ backgroundColor: availableColors.find(ac => ac.name.toLowerCase() === item.selectedColor?.toLowerCase())?.hex || '#333' }}></div>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1">Qtd: {item.quantity}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Total */}
+                    <div className="flex justify-between items-center mt-6 pt-4 border-t border-white/10">
+                        <span className="text-gray-400 text-sm font-bold uppercase">Total do Pedido</span>
+                        <span className="text-2xl font-bold text-ios-green">R$ {viewingSale.total.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                 </div>
+            </div>
+        )}
+      </Modal>
+
       {/* Admin Modal */}
       {isAdminOpen && (
         <div className="fixed inset-0 z-[70] bg-black/95 backdrop-blur-xl flex flex-col animate-fade-in">
@@ -1414,7 +1480,11 @@ export default function App() {
                                                 </thead>
                                                 <tbody>
                                                     {filteredSales.length > 0 ? filteredSales.map((sale) => (
-                                                        <tr key={sale.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                                                        <tr 
+                                                            key={sale.id} 
+                                                            onClick={() => setViewingSale(sale)}
+                                                            className="border-b border-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                                                        >
                                                             <td className="p-4 whitespace-nowrap">
                                                                 <div className="flex items-center gap-2">
                                                                     <Calendar className="w-3 h-3 text-gray-500" />
